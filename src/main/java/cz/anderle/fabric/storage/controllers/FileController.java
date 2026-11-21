@@ -23,7 +23,7 @@ public class FileController implements FileApi {
 
     @Override
     public ResponseEntity<FileListResponse> listFiles(UUID directoryId, Integer limit, Integer offset) {
-        return FileApi.super.listFiles(directoryId, limit, offset);
+        return ResponseEntity.ok(fileService.listFiles(directoryId, limit, offset));
     }
 
     @Override

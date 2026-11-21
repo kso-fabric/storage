@@ -1,17 +1,38 @@
 package cz.anderle.fabric.storage.services;
 
+import cz.anderle.fabric.storage.api.model.FileListResponse;
+import cz.anderle.fabric.storage.api.model.FileMetadata;
 import cz.anderle.fabric.storage.config.StorageProperties;
+import cz.anderle.fabric.storage.repositories.FileRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Slf4j
 @Service
 public class FileService {
 
     private final StorageProperties storageProperties;
+    private final FileRepository fileRepository;
 
-    FileService(StorageProperties storageProperties) {
+    FileService(StorageProperties storageProperties, FileRepository fileRepository) {
         this.storageProperties = storageProperties;
+        this.fileRepository = fileRepository;
+    }
+
+    public FileListResponse listFiles(UUID directoryId, Integer limit, Integer offset) {
+        log.info("Listing files with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
+//        var fileRecords = fileRepository.findAllByDirectory(directoryId, limit, offset).stream()
+//                .forEach(r -> {
+//                    new FileMetadata(r.getId(),
+//                                     r.getName(),
+//                                     r.size(),
+//                                     r.getChecksum(),
+//                                     r.get)
+//                });
+
+        return new FileListResponse();
     }
 
 //    public FileListResponseDTO getFiles(

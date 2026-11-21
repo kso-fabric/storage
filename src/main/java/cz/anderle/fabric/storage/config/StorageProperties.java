@@ -12,5 +12,5 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "cz.anderle.fabric.storage")
 public class StorageProperties {
 
-    private String discPath;
+    private String discRoot;
 }

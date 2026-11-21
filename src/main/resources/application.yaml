@@ -13,11 +13,16 @@ spring:
     password: liquibase
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
-  jooq:
-    sql-dialect: POSTGRES
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
 
 cz:
   anderle:
     fabric:
       storage:
-        disc-path: "C:/Users/Jakub Anderle/programy/oracle/storage/disc"
+        disc-root: "C:/Users/Jakub Anderle/programy/oracle/storage/disc"

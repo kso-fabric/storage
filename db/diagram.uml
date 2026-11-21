@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Diagram>
+  <ID>DATABASE</ID>
+  <OriginalElement>18e6e489-67aa-403f-979f-e7f911061d6f.SCHEMA:storage.public</OriginalElement>
+  <nodes>
+    <node x="712.0227524972254" y="426.6942286348502">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.databasechangeloglock</node>
+    <node x="-451.3634850166482" y="202.4322974472808">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.file</node>
+    <node x="722.5227524972254" y="11.487236403995553">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.databasechangelog</node>
+    <node x="-82.60233074361815" y="77.37036625971143">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata</node>
+    <node x="-82.60233074361815" y="253.64217536071033">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata_tag</node>
+    <node x="-451.3634850166482" y="-67.40122086570477">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.directory</node>
+    <node x="100.82175360710323" y="77.37036625971143">18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.tag</node>
+  </nodes>
+  <notes />
+  <edges>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.file" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.directory" relationship="REFERENCES">
+      <point x="60.25" y="-127.5" />
+      <point x="-270.6134850166482" y="272.6945615982243" />
+      <point x="-184.82933407325203" y="272.6945615982243" />
+      <point x="-184.82933407325203" y="98.3533407325184" />
+      <point x="-270.6134850166482" y="98.3533407325184" />
+      <point x="60.25" y="91.5" />
+    </edge>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata_tag" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.tag" relationship="REFERENCES">
+      <point x="36.91536071032186" y="-43.0" />
+      <point x="28.143751387347436" y="322.1903218645949" />
+      <point x="163.95551685327212" y="322.1903218645949" />
+      <point x="-6.866236753831117" y="33.83138734739077" />
+    </edge>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.file" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata" relationship="REFERENCES">
+      <point x="-60.25" y="-127.5" />
+      <point x="-391.1134850166482" y="415.6681465038845" />
+      <point x="-160.0" y="415.6681465038845" />
+      <point x="-160.0" y="177.204217536071" />
+      <point x="-23.102330743618154" y="177.204217536071" />
+      <point x="0.0" y="55.5" />
+    </edge>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata_tag" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata" relationship="REFERENCES">
+      <point x="-13.979555288792312" y="-41.428164190899764" />
+      <point x="-22.75116461176674" y="234.46260821309653" />
+      <point x="-23.102330743618154" y="234.46260821309653" />
+      <point x="0.0" y="55.5" />
+    </edge>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.directory" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.metadata" relationship="REFERENCES">
+      <point x="0.0" y="-91.5" />
+      <point x="-330.8634850166482" y="74.5069589345172" />
+      <point x="-118.97873473917866" y="74.5069589345172" />
+      <point x="-118.97873473917866" y="176.45858490566036" />
+      <point x="-23.102330743618154" y="176.45858490566036" />
+      <point x="0.0" y="55.5" />
+    </edge>
+    <edge source="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.directory" target="18e6e489-67aa-403f-979f-e7f911061d6f.TABLE:storage.public.directory" relationship="REFERENCES">
+      <point x="-120.5" y="-0.0" />
+      <point x="-490.8634850166482" y="24.098779134295228" />
+      <point x="-490.8634850166482" y="164.09877913429523" />
+      <point x="-391.1134850166482" y="164.09877913429523" />
+      <point x="-60.25" y="91.5" />
+    </edge>
+  </edges>
+  <RemovedNodes />
+  <RemovedEdges />
+  <settings layout="Hierarchic Compact" zoom="1.1890308277027029" showDependencies="false" x="9.207636720086725" y="222.40395116537076" />
+  <SelectedNodes />
+  <Categories>
+    <Category>Columns</Category>
+    <Category>Comments</Category>
+    <Category>Key columns</Category>
+    <Category>Virtual foreign keys</Category>
+  </Categories>
+</Diagram>
+

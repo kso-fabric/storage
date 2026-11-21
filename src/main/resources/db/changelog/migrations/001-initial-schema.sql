@@ -23,7 +23,7 @@ CREATE TABLE directory
         ON DELETE RESTRICT,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    metadata_id UUID UNIQUE REFERENCES metadata (id),
+    metadata_id UUID         NOT NULL UNIQUE REFERENCES metadata (id),
 
     CONSTRAINT chk_directory_name
         CHECK (length(trim(name)) > 0),
@@ -44,7 +44,7 @@ CREATE TABLE file
     checksum     CHAR(64)     NOT NULL,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    metadata_id  UUID UNIQUE REFERENCES metadata (id),
+    metadata_id  UUID         NOT NULL UNIQUE REFERENCES metadata (id),
 
     CONSTRAINT chk_file_name
         CHECK (length(trim(name)) > 0),
@@ -59,14 +59,22 @@ CREATE TABLE file
 
 CREATE TABLE tag
 (
-    metadata_id UUID         NOT NULL
-        REFERENCES metadata (id) ON DELETE CASCADE,
-    value       VARCHAR(100) NOT NULL,
-
-    PRIMARY KEY (metadata_id, value),
+    id    UUID PRIMARY KEY,
+    value VARCHAR(100) NOT NULL UNIQUE,
 
     CONSTRAINT chk_tag_value
         CHECK (length(trim(value)) > 0)
+);
+
+CREATE TABLE metadata_tag
+(
+    metadata_id UUID NOT NULL
+        REFERENCES metadata (id) ON DELETE CASCADE,
+
+    tag_id      UUID NOT NULL
+        REFERENCES tag (id) ON DELETE RESTRICT,
+
+    PRIMARY KEY (metadata_id, tag_id)
 );
 
 -- Unique names within the same parent directory,
@@ -88,5 +96,5 @@ CREATE INDEX idx_file_directory_id
 
 -- Tag filtering.
 
-CREATE INDEX idx_tag_value
-    ON tag (value);
+CREATE INDEX idx_metadata_tag_tag_id
+    ON metadata_tag (tag_id);

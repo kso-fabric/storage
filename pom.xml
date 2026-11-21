@@ -16,12 +16,6 @@
 		<java.version>25</java.version>
 		<openapi-generator.version>7.26.0</openapi-generator.version>
 
-		<jooq.url>localhost:5432/storage</jooq.url>
-		<jooq.package>cz.anderle.fabric.storage.jooq</jooq.package>
-		<jooq.schema>public</jooq.schema>
-		<jooq.user>storage</jooq.user>
-		<jooq.password>storage</jooq.password>
-
 		<api.path>api/storageapi.yaml</api.path>
 		<api.package>cz.anderle.fabric.storage.api</api.package>
 	</properties>
@@ -38,7 +32,7 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-jooq</artifactId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
 
 		<dependency>
@@ -74,58 +68,6 @@
 
 	<build>
 		<plugins>
-			<!-- Jooq generator -->
-			<plugin>
-				<groupId>org.jooq</groupId>
-				<artifactId>jooq-codegen-maven</artifactId>
-
-				<executions>
-					<execution>
-						<id>generate-jooq</id>
-						<phase>generate-sources</phase>
-						<goals>
-							<goal>generate</goal>
-						</goals>
-					</execution>
-				</executions>
-
-				<dependencies>
-					<dependency>
-						<groupId>org.postgresql</groupId>
-						<artifactId>postgresql</artifactId>
-						<version>${postgresql.version}</version>
-					</dependency>
-				</dependencies>
-
-				<configuration>
-					<jdbc>
-						<driver>org.postgresql.Driver</driver>
-						<url>jdbc:postgresql://${jooq.url}</url>
-						<user>${jooq.user}</user>
-						<password>${jooq.password}</password>
-					</jdbc>
-
-					<generator>
-						<database>
-							<name>org.jooq.meta.postgres.PostgresDatabase</name>
-							<inputSchema>${jooq.schema}</inputSchema>
-							<excludes>databasechangelog|databasechangeloglock</excludes>
-						</database>
-
-						<generate>
-							<records>true</records>
-							<pojos>false</pojos>
-							<daos>false</daos>
-							<javaTimeTypes>true</javaTimeTypes>
-						</generate>
-
-						<target>
-							<packageName>${jooq.package}</packageName>
-							<directory>target/generated-sources/jooq</directory>
-						</target>
-					</generator>
-				</configuration>
-			</plugin>
 
 			<!-- OpenApi generator -->
 			<plugin>
