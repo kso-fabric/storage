@@ -6,13 +6,11 @@ import cz.anderle.fabric.storage.api.model.FileMetadata;
 import cz.anderle.fabric.storage.api.model.UpdateItemRequest;
 import cz.anderle.fabric.storage.services.FileService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/v1/files")
 public class FileController implements FileApi {
 
     private final FileService fileService;
@@ -28,7 +26,7 @@ public class FileController implements FileApi {
 
     @Override
     public ResponseEntity<FileMetadata> updateFile(UUID id, UpdateItemRequest updateFileRequest) {
-        return FileApi.super.updateFile(id, updateFileRequest);
+        return ResponseEntity.ok(fileService.updateFile(id, updateFileRequest));
     }
 
     @Override

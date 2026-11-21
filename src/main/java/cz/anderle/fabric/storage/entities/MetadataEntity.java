@@ -1,6 +1,5 @@
 package cz.anderle.fabric.storage.entities;
 
-import cz.anderle.fabric.storage.config.Constants;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,26 +12,27 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = Constants.Table.Metadata.TABLE_NAME)
+@Table(name = "metadata")
 @Getter
 @Setter
 public class MetadataEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = Constants.Table.Metadata.DESCRIPTION)
+    @Column(name = "description")
     private String description;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = Constants.Table.Metadata.CUSTOM, columnDefinition = "jsonb")
+    @Column(name = "custom", columnDefinition = "jsonb")
     private Map<String, Object> custom;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-            name = Constants.Table.MetadataTag.TABLE_NAME,
-            joinColumns = @JoinColumn(name = Constants.Table.MetadataTag.METADATA_ID),
-            inverseJoinColumns = @JoinColumn(name = Constants.Table.MetadataTag.TAG_ID)
+            name = "metadata_tag",
+            joinColumns = @JoinColumn(name = "metadata_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
     private Set<TagEntity> tags = new HashSet<>();
 }

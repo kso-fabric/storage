@@ -1,29 +1,21 @@
 package cz.anderle.fabric.storage.entities;
 
-import cz.anderle.fabric.storage.config.Constants;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.UUID;
 
 @Entity
-@Table(name = Constants.Table.Tag.TABLE_NAME)
+@Table(name = "tag")
 @Getter
 @Setter
 public class TagEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(
-            name = Constants.Table.Tag.VALUE,
-            nullable = false,
-            unique = true,
-            length = 100
-    )
+    @Column(name = "value", nullable = false, unique = true, length = 100)
     private String value;
 }

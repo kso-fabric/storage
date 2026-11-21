@@ -41,7 +41,7 @@ CREATE TABLE file
         ON DELETE RESTRICT,
     size         BIGINT       NOT NULL,
     content_type VARCHAR(255),
-    checksum     CHAR(64)     NOT NULL,
+    checksum     VARCHAR(64)  NOT NULL,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     metadata_id  UUID         NOT NULL UNIQUE REFERENCES metadata (id),

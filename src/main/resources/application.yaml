@@ -1,3 +1,7 @@
+server:
+  servlet:
+    context-path: /storage/v1
+
 spring:
   application:
     name: storage

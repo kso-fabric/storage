@@ -2,10 +2,17 @@ package cz.anderle.fabric.storage.services;
 
 import cz.anderle.fabric.storage.api.model.FileListResponse;
 import cz.anderle.fabric.storage.api.model.FileMetadata;
+import cz.anderle.fabric.storage.api.model.UpdateItemRequest;
 import cz.anderle.fabric.storage.config.StorageProperties;
+import cz.anderle.fabric.storage.entities.FileEntity;
+import cz.anderle.fabric.storage.exceptions.NotFoundException;
+import cz.anderle.fabric.storage.mappers.FileMapper;
 import cz.anderle.fabric.storage.repositories.FileRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -21,58 +28,41 @@ public class FileService {
         this.fileRepository = fileRepository;
     }
 
+    @Transactional(readOnly = true)
     public FileListResponse listFiles(UUID directoryId, Integer limit, Integer offset) {
         log.info("Listing files with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
-//        var fileRecords = fileRepository.findAllByDirectory(directoryId, limit, offset).stream()
-//                .forEach(r -> {
-//                    new FileMetadata(r.getId(),
-//                                     r.getName(),
-//                                     r.size(),
-//                                     r.getChecksum(),
-//                                     r.get)
-//                });
 
-        return new FileListResponse();
+        Page<FileEntity> entities;
+        if (directoryId == null) {
+            entities = fileRepository.findByDirectoryIsNull(
+                    Pageable.ofSize(limit)
+                            .withPage(offset / limit));
+        } else {
+            entities = fileRepository.findByDirectory_Id(
+                    directoryId,
+                    Pageable.ofSize(limit)
+                            .withPage(offset / limit));
+        }
+
+        var resp = new FileListResponse();
+        resp.setTotal(entities.getTotalElements());
+        for (var entity : entities) {
+            resp.addFilesItem(FileMapper.toDto(entity));
+        }
+
+        return resp;
     }
 
-//    public FileListResponseDTO getFiles(
-//            int limit,
-//            int offset,
-//            UUID directoryId) {
-//        log.info("Getting files with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
-//
-//    public FileMetadataDTO upload(
-//            String fileName,
-//            UUID directoryId,
-//            String contentSHA5256,
-//            InputStream input) {
-//        log.info("Uploading file: {}, directoryId: {}, contentSHA5256: {}", fileName, directoryId, contentSHA5256);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
-//
-//    public FileMetadataDTO getFileMetadata(
-//            UUID fileId) {
-//        log.info("Getting file metadata for fileId: {}", fileId);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
-//
-//    public FileMetadataDTO updateFileMetadata(
-//            UUID fileId) {
-//        log.info("Updating file metadata for fileId: {}", fileId);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
-//
-//    public void deleteFile(
-//            UUID fileId) {
-//        log.info("Deleting file with fileId: {}", fileId);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
-//
-//    public InputStream getFileContent(
-//            UUID fileId) {
-//        log.info("Getting file content for fileId: {}", fileId);
-//        throw new UnsupportedOperationException("Not implemented yet");
-//    }
+    public FileMetadata updateFile(UUID id, UpdateItemRequest updateFileRequest) {
+        log.info("Updating file: {}", id);
+
+        var entity = fileRepository.findById(id);
+        if (entity.isEmpty()) {
+            log.error("File {} not found", id);
+            throw new NotFoundException("File %s not found", id);
+        }
+
+        return new FileMetadata();
+    }
+
 }

@@ -1,18 +1,32 @@
 package cz.anderle.fabric.storage.entities;
 
-import cz.anderle.fabric.storage.config.Constants;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
 @Entity
-@Table(name = Constants.Table.File.TABLE_NAME)
+@Table(name = "file")
+@Getter
+@Setter
 public class FileEntity extends EntryEntity {
 
     @Id
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = Constants.Table.File.DIRECTORY_ID)
+    @JoinColumn(name = "directory_id")
     private DirectoryEntity directory;
+
+    @Column(name = "size", nullable = false)
+    private long size;
+
+    @Column(name = "content_type", length = 255)
+    private String contentType;
+
+    @Column(name = "checksum", nullable = false, length = 64)
+    private String checksum;
 }

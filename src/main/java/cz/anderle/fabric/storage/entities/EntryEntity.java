@@ -1,6 +1,5 @@
 package cz.anderle.fabric.storage.entities;
 
-import cz.anderle.fabric.storage.config.Constants;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,19 +13,15 @@ import java.time.Instant;
 @Setter
 public abstract class EntryEntity {
 
-    @Column(name = Constants.Table.Entry.NAME, nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @CreationTimestamp
-    @Column(
-            name = Constants.Table.Entry.CREATED_AT,
-            nullable = false,
-            updatable = false
-    )
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @UpdateTimestamp
-    @Column(name = Constants.Table.Entry.UPDATED_AT, nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @OneToOne(
@@ -35,7 +30,7 @@ public abstract class EntryEntity {
             cascade = CascadeType.PERSIST
     )
     @JoinColumn(
-            name = Constants.Table.Entry.METADATA_ID,
+            name = "metadata_id",
             nullable = false,
             unique = true
     )
