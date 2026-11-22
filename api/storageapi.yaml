@@ -247,13 +247,41 @@ components:
       type: object
       minProperties: 1
       properties:
-        name: { type: string, minLength: 1 }
+        name:
+          type: [ string, "null" ]
+          minLength: 1
         directoryId:
           type: [ string, "null" ]
           format: uuid
-          description: Null moves the item to root; omission leaves it unchanged.
         additionalData:
-          $ref: "#/components/schemas/Metadata"
+          oneOf:
+            - $ref: "#/components/schemas/UpdateMetadataRequest"
+            - type: "null"
+    UpdateMetadataRequest:
+      type: object
+      minProperties: 1
+      properties:
+        description:
+          type: [ string, "null" ]
+          maxLength: 2000
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateTagItem'
+        custom:
+          type: [ object, "null" ]
+          additionalProperties: true
+    UpdateTagItem:
+      type: object
+      required: [ value, action ]
+      properties:
+        value:
+          type: string
+          minLength: 1
+          maxLength: 100
+        action:
+          type: string
+          enum: [ ADD, DELETE ]
     CreateDirectoryRequest:
       type: object
       required: [ name ]

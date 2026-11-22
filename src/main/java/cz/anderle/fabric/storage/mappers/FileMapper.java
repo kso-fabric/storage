@@ -1,11 +1,16 @@
 package cz.anderle.fabric.storage.mappers;
 
 import cz.anderle.fabric.storage.api.model.FileMetadata;
+import cz.anderle.fabric.storage.api.model.UpdateItemRequest;
+import cz.anderle.fabric.storage.entities.DirectoryEntity;
 import cz.anderle.fabric.storage.entities.FileEntity;
+import org.openapitools.jackson.nullable.JsonNullable;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 public interface FileMapper {
 

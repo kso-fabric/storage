@@ -1,0 +1,13 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  liquibase:
+    enabled: true
+
+logging:
+  level:
+    root: WARN
+    cz.anderle.fabric.storage: INFO

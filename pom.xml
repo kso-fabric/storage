@@ -43,6 +43,12 @@
 
 		<dependency>
 			<groupId>org.openapitools</groupId>
+			<artifactId>jackson-databind-nullable</artifactId>
+			<version>0.2.8</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.openapitools</groupId>
 			<artifactId>openapi-generator-maven-plugin</artifactId>
 			<version>${openapi-generator.version}</version>
 			<scope>compile</scope>
@@ -64,6 +70,25 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -88,7 +113,7 @@
 								<useSpringBoot4>true</useSpringBoot4>
 								<useJakartaEe>true</useJakartaEe>
 								<useTags>true</useTags>
-								<openApiNullable>false</openApiNullable>
+								<openApiNullable>true</openApiNullable>
 								<documentationProvider>none</documentationProvider>
 								<annotationLibrary>none</annotationLibrary>
 

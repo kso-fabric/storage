@@ -1,3 +1,5 @@
+name: storage
+
 services:
   postgres:
     image: postgres:17
@@ -17,7 +19,7 @@ services:
       - ./init:/docker-entrypoint-initdb.d:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d storage"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
