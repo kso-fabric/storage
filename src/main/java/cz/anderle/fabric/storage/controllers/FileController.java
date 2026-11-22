@@ -5,9 +5,14 @@ import cz.anderle.fabric.storage.api.model.FileListResponse;
 import cz.anderle.fabric.storage.api.model.FileMetadata;
 import cz.anderle.fabric.storage.api.model.UpdateItemRequest;
 import cz.anderle.fabric.storage.services.FileService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.UUID;
 
 @RestController
@@ -30,8 +35,23 @@ public class FileController implements FileApi {
     }
 
     @Override
-    public ResponseEntity<FileMetadata> uploadFile(String xFileName, UUID xDirectoryId, String xContentSHA256) {
-        return FileApi.super.uploadFile(xFileName, xDirectoryId, xContentSHA256);
+    public ResponseEntity<FileMetadata> uploadFile(String xFileName,
+                                                   Resource body,
+                                                   UUID xDirectoryId,
+                                                   String xContentSHA256,
+                                                   String xContentType) {
+        try (InputStream input = body.getInputStream()) {
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(fileService.uploadFile(xFileName,
+                                                 xDirectoryId,
+                                                 xContentSHA256,
+                                                 xContentType,
+                                                 body.contentLength(),
+                                                 input));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

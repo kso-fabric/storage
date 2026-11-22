@@ -69,7 +69,7 @@ class FileServiceTests extends TestBase {
         Assertions.assertEquals(2, response.getTotal());
         Assertions.assertEquals(2, response.getFiles().size());
         Assertions.assertTrue(response.getFiles().stream()
-                                      .allMatch(file -> first.getId().equals(file.getDirectoryId().get())));
+                                      .allMatch(file -> first.getId().equals(file.getDirectoryId())));
     }
 
     @Test
@@ -133,7 +133,7 @@ class FileServiceTests extends TestBase {
 
         var result = fileService.updateFile(file.getId(), request);
 
-        Assertions.assertEquals(directory.getId(), result.getDirectoryId().get());
+        Assertions.assertEquals(directory.getId(), result.getDirectoryId());
         Assertions.assertEquals(directory.getId(),
                                 reloadFile(file.getId()).getDirectory().getId());
     }
@@ -148,7 +148,7 @@ class FileServiceTests extends TestBase {
 
         var result = fileService.updateFile(file.getId(), request);
 
-        Assertions.assertNull(result.getDirectoryId().get());
+        Assertions.assertNull(result.getDirectoryId());
         Assertions.assertNull(reloadFile(file.getId()).getDirectory());
     }
 
@@ -438,6 +438,7 @@ class FileServiceTests extends TestBase {
     private FileEntity createFile(String name, DirectoryEntity directory) {
         return transactionTemplate.execute(status -> {
             var file = new FileEntity();
+            file.setId(UUID.randomUUID());
             file.setName(name);
             file.setDirectory(directory);
             file.setSize(1024L);
@@ -445,7 +446,10 @@ class FileServiceTests extends TestBase {
             file.setChecksum("a".repeat(64));
             file.setMetadata(new MetadataEntity());
 
-            return fileRepository.saveAndFlush(file);
+            entityManager.persist(file);
+            entityManager.flush();
+
+            return file;
         });
     }
 

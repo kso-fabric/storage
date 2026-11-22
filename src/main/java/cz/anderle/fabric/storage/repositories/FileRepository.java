@@ -15,4 +15,8 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
                                         Pageable pageable);
 
     Page<FileEntity> findByDirectoryIsNull(Pageable pageable);
+
+    Boolean existsByDirectoryIsNullAndName(String name);
+
+    Boolean existsByDirectory_IdAndName(UUID directoryId, String name);
 }

@@ -25,8 +25,12 @@ spring:
       hibernate:
         format_sql: true
 
+  http:
+    converters:
+      preferred-json-mapper: jackson2
+
 cz:
   anderle:
     fabric:
       storage:
-        disc-root: "C:/Users/Jakub Anderle/programy/oracle/storage/disc"
+        disc-root: "C:/Users/Jakub Anderle/IdeaProjects/storage/disc"

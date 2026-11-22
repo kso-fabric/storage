@@ -10,25 +10,32 @@ import cz.anderle.fabric.storage.entities.FileEntity;
 import cz.anderle.fabric.storage.entities.MetadataEntity;
 import cz.anderle.fabric.storage.entities.TagEntity;
 import cz.anderle.fabric.storage.exceptions.BadRequestException;
+import cz.anderle.fabric.storage.exceptions.ChecksumMismatchException;
+import cz.anderle.fabric.storage.exceptions.ConflictException;
 import cz.anderle.fabric.storage.exceptions.NotFoundException;
 import cz.anderle.fabric.storage.mappers.FileMapper;
 import cz.anderle.fabric.storage.repositories.DirectoryRepository;
 import cz.anderle.fabric.storage.repositories.FileRepository;
 import cz.anderle.fabric.storage.repositories.TagRepository;
 import cz.anderle.fabric.storage.utils.MapperUtils;
+import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -38,12 +45,16 @@ public class FileService {
     private final FileRepository fileRepository;
     private final DirectoryRepository directoryRepository;
     private final TagRepository tagRepository;
+    private final EntityManager entityManager;
+    private final TransactionTemplate transactionTemplate;
 
-    FileService(StorageProperties storageProperties, FileRepository fileRepository, DirectoryRepository directoryRepository, TagRepository tagRepository) {
+    FileService(StorageProperties storageProperties, FileRepository fileRepository, DirectoryRepository directoryRepository, TagRepository tagRepository, EntityManager entityManager, TransactionTemplate transactionTemplate) {
         this.storageProperties = storageProperties;
         this.fileRepository = fileRepository;
         this.directoryRepository = directoryRepository;
         this.tagRepository = tagRepository;
+        this.entityManager = entityManager;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -77,14 +88,10 @@ public class FileService {
     public FileMetadata updateFile(UUID id, UpdateItemRequest updateFileRequest) {
         log.info("Updating file: {}", id);
 
-        var entOpt = fileRepository.findById(id);
-        if (entOpt.isEmpty()) {
-            log.error("File {} not found", id);
-            throw new NotFoundException("File", id);
-        }
-        var entity = entOpt.get();
+        var fileEntity = fileRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("File", id));
 
-        MapperUtils.applyIfPresent(updateFileRequest.getName(), entity::setName);
+        MapperUtils.applyIfPresent(updateFileRequest.getName(), fileEntity::setName);
 
         if (updateFileRequest.getDirectoryId().isPresent()) {
             var dirId = updateFileRequest.getDirectoryId().get();
@@ -93,16 +100,74 @@ public class FileService {
                 dirEntity = directoryRepository.findById(dirId)
                         .orElseThrow(() -> new NotFoundException("Directory", dirId));
             }
-            entity.setDirectory(dirEntity);
+            fileEntity.setDirectory(dirEntity);
         }
 
-        updateMetadata(updateFileRequest, entity);
+        updateMetadata(updateFileRequest, fileEntity);
 
-        return FileMapper.toDto(entity);
+        return FileMapper.toDto(fileEntity);
     }
 
-    public FileMetadata uploadFile(String fileName, UUID directoryId, String sha256) {
-        return new FileMetadata();
+    public FileMetadata uploadFile(String fileName,
+                                   UUID directoryId,
+                                   String sha256,
+                                   String contentType,
+                                   long contentLength,
+                                   InputStream input) throws IOException {
+        log.info("Uploading new file {} in directory {}", fileName, directoryId);
+
+        DirectoryEntity dirEntity = null;
+        if (directoryId != null) {
+            dirEntity = directoryRepository.findById(directoryId)
+                    .orElseThrow(() -> new NotFoundException("Directory", directoryId));
+        }
+
+        if (directoryId == null
+                ? fileRepository.existsByDirectoryIsNullAndName(fileName)
+                : fileRepository.existsByDirectory_IdAndName(directoryId, fileName)) {
+            throw new ConflictException("File %s already exists in directory %s",
+                                        fileName,
+                                        directoryId);
+        }
+
+        if (contentLength >= 0) {
+            log.info("Content-Length: {}", contentLength);
+            // TODO add free space check
+        }
+
+        var fileEntity = new FileEntity();
+        fileEntity.setId(UUID.randomUUID());
+        fileEntity.setName(fileName);
+        fileEntity.setDirectory(dirEntity);
+        fileEntity.setContentType(contentType);
+        fileEntity.setMetadata(new MetadataEntity());
+
+        var path = getFilePath(fileEntity);
+        var digest = getDigest();
+
+        try {
+            try (var digestInput = new DigestInputStream(input, digest)) {
+                Files.copy(digestInput, path);
+            }
+
+            fileEntity.setChecksum(calculateChecksum(sha256, digest));
+            fileEntity.setSize(Files.size(path));
+
+            transactionTemplate.executeWithoutResult(status -> {
+                entityManager.persist(fileEntity);
+                entityManager.flush();
+            });
+
+            log.info("Uploaded file {}", fileEntity.getId());
+            return FileMapper.toDto(fileEntity);
+        } catch (IOException | RuntimeException e) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException cleanupException) {
+                e.addSuppressed(cleanupException);
+            }
+            throw e;
+        }
     }
 
     //region Update file
@@ -199,6 +264,37 @@ public class FileService {
                 throw new BadRequestException();
             }
         }
+    }
+
+    //endregion
+
+    //region Upload file
+
+    private Path getFilePath(FileEntity fileEntity) throws IOException {
+        var path = Path.of(storageProperties.getDiscRoot(),
+                           fileEntity.getId().toString());
+        Files.createDirectories(path.getParent());
+        log.info("Uploading new file to: {}", path);
+        return path;
+    }
+
+    private MessageDigest getDigest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    private String calculateChecksum(String sha256, MessageDigest digest) {
+        var calculatedChecksum = HexFormat.of()
+                .formatHex(digest.digest());
+
+        if (sha256 != null && !sha256.equalsIgnoreCase(calculatedChecksum)) {
+            throw new ChecksumMismatchException();
+        }
+
+        return calculatedChecksum;
     }
 
     //endregion

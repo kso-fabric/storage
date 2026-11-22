@@ -51,10 +51,17 @@ paths:
           in: header
           description: Expected SHA-256 checksum in hexadecimal
           schema: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+        - name: X-Content-Type
+          in: header
+          description: File Content-Type
+          schema: { type: string, example: "image/x-canon-cr2" }
       requestBody:
         required: true
         content:
-          application/octet-stream: { }
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
       responses:
         "201":
           description: File uploaded successfully
@@ -226,7 +233,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        directoryId: { type: [ string, "null" ], format: uuid }
+        directoryId: { type: string, format: uuid }
         size: { type: integer, format: int64 }
         contentType: { type: string }
         checksum: { type: string, description: SHA-256 checksum in hexadecimal }
