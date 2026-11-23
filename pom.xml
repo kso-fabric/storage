@@ -8,7 +8,7 @@
 		<version>4.1.1</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>cz.anderle.fabric</groupId>
+	<groupId>cz.kso.fabric</groupId>
 	<artifactId>storage</artifactId>
 	<version>0.1.0</version>
 
@@ -17,7 +17,7 @@
 		<openapi-generator.version>7.26.0</openapi-generator.version>
 
 		<api.path>api/storageapi.yaml</api.path>
-		<api.package>cz.anderle.fabric.storage.api</api.package>
+		<api.package>cz.kso.fabric.storage.api</api.package>
 	</properties>
 	<dependencies>
 		<dependency>

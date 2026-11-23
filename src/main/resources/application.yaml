@@ -26,7 +26,7 @@ spring:
         format_sql: true
 
 cz:
-  anderle:
+  kso:
     fabric:
       storage:
         disc-root: "C:/Users/Jakub Anderle/IdeaProjects/storage/disc"

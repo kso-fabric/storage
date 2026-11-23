@@ -1,0 +1,132 @@
+package cz.kso.fabric.storage.services;
+
+import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
+import cz.kso.fabric.storage.api.model.DirectoryMetadata;
+import cz.kso.fabric.storage.api.model.UpdateItemRequest;
+import cz.kso.fabric.storage.entities.DirectoryEntity;
+import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.exceptions.BadRequestException;
+import cz.kso.fabric.storage.exceptions.NotFoundException;
+import cz.kso.fabric.storage.mappers.DirectoryMapper;
+import cz.kso.fabric.storage.repositories.DirectoryRepository;
+import cz.kso.fabric.storage.repositories.FileRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@Slf4j
+@Service
+public class DirectoryService {
+
+    private final DirectoryRepository directoryRepository;
+    private final FileRepository fileRepository;
+    private final FileService fileService;
+
+    public DirectoryService(DirectoryRepository directoryRepository, FileRepository fileRepository, FileService fileService) {
+        this.directoryRepository = directoryRepository;
+        this.fileRepository = fileRepository;
+        this.fileService = fileService;
+    }
+
+    @Transactional
+    public DirectoryMetadata createDirectory(CreateDirectoryRequest request) {
+        var parentDirId = request.getParentId().orElse(null);
+        log.info("Creating new directory in {}", parentDirId);
+
+        // TODO authorization
+
+        DirectoryEntity parentDir = null;
+        if (parentDirId != null) {
+            parentDir = directoryRepository.findById(parentDirId)
+                    .orElseThrow(() -> new NotFoundException("Directory", parentDirId));
+        }
+
+        var dirEntity = new DirectoryEntity();
+        dirEntity.setName(request.getName());
+        dirEntity.setParent(parentDir);
+        dirEntity.setMetadata(new MetadataEntity());
+
+        dirEntity = directoryRepository.save(dirEntity);
+
+        log.info("New directory created: {}", dirEntity.getId());
+        return DirectoryMapper.toDto(dirEntity);
+    }
+
+    public DirectoryMetadata getDirectory(UUID id) {
+        log.info("Getting directory: {}", id);
+
+        var dirEntity = directoryRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Directory", id));
+
+        return DirectoryMapper.toDto(dirEntity);
+    }
+
+    public DirectoryMetadata updateDirectory(UUID id, UpdateItemRequest request) {
+        return new DirectoryMetadata();
+    }
+
+    public void deleteDirectory(UUID id) {
+        log.info("Deleting directory: {}", id);
+
+        // TODO authorization
+        // TODO locking
+        if (id == null) {
+            throw new BadRequestException("Cannot delete root directory");
+        }
+
+        if (!directoryRepository.existsById(id)) {
+            throw new NotFoundException("Directory", id);
+        }
+
+        try {
+            deleteDirectoryFiles(id);
+            deleteDirectoriesInParent(id);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        directoryRepository.deleteById(id);
+    }
+
+    //region Delete directory
+
+    private void deleteDirectoryFiles(UUID directoryId) throws IOException {
+        var firstPage = PageRequest.of(0, 100);
+
+        while (true) {
+            var fileIds = fileRepository.findFileIdsByDirectoryId(directoryId,
+                                                                  firstPage);
+
+            if (fileIds.isEmpty()) {
+                break;
+            }
+
+            for (UUID fileId : fileIds) {
+                fileService.deleteFile(fileId);
+            }
+        }
+    }
+
+    private void deleteDirectoriesInParent(UUID parentId) {
+        var firstPage = PageRequest.of(0, 100);
+
+        while (true) {
+            var dirIds = directoryRepository.findDirectoryIdsByParentId(parentId,
+                                                                         firstPage);
+
+            if (dirIds.isEmpty()) {
+                break;
+            }
+
+            for (UUID dirId : dirIds) {
+                deleteDirectory(dirId);
+            }
+        }
+    }
+
+    //endregion
+}
