@@ -120,14 +120,29 @@ paths:
       summary: Download file content
       responses:
         "200":
-          description: Binary file content
+          description: |
+            File content.
+            The Content-Type header contains the stored MIME type
+            of the file, or application/octet-stream if unknown.
           headers:
             Content-Disposition:
-              schema: { type: string }
+              description: Original filename
+              schema:
+                type: string
             Content-Length:
-              schema: { type: integer, format: int64 }
+              description: File size in bytes
+              schema:
+                type: integer
+                format: int64
+            Content-Digest:
+              description: SHA-256 digest (RFC 9530)
+              schema:
+                type: string
           content:
-            application/octet-stream: { }
+            '*/*':
+              schema:
+                type: string
+                format: binary
         "404": { $ref: "#/components/responses/NotFound" }
   /directories:
     post:

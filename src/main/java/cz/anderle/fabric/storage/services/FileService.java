@@ -20,13 +20,18 @@ import cz.anderle.fabric.storage.repositories.TagRepository;
 import cz.anderle.fabric.storage.utils.MapperUtils;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -60,7 +65,7 @@ public class FileService {
     @Transactional(readOnly = true)
     public FileListResponse listFiles(UUID directoryId, Integer limit, Integer offset) {
         log.info("Listing files with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
-
+        // TODO authorization
         var pageable = PageRequest.of(
                 offset / limit,
                 limit,
@@ -84,10 +89,19 @@ public class FileService {
         return resp;
     }
 
+    public FileMetadata getFile(UUID id) {
+        log.info("Getting file: {}", id);
+        // TODO authorization
+        var fileEntity = fileRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("File", id));
+
+        return FileMapper.toDto(fileEntity);
+    }
+
     @Transactional
     public FileMetadata updateFile(UUID id, UpdateItemRequest updateFileRequest) {
         log.info("Updating file: {}", id);
-
+        // TODO authorization
         var fileEntity = fileRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("File", id));
 
@@ -115,7 +129,7 @@ public class FileService {
                                    long contentLength,
                                    InputStream input) throws IOException {
         log.info("Uploading new file {} in directory {}", fileName, directoryId);
-
+        // TODO authorization
         DirectoryEntity dirEntity = null;
         if (directoryId != null) {
             dirEntity = directoryRepository.findById(directoryId)
@@ -168,6 +182,26 @@ public class FileService {
             }
             throw e;
         }
+    }
+
+    @Transactional
+    public FileDownload prepareDownload(UUID id) {
+        log.info("Getting file content: {}", id);
+
+        // TODO authorization
+        var fileEntity = getFile(id);
+
+        var file = Path.of(storageProperties.getDiscRoot(), id.toString()).toFile();
+        if (!file.exists()) {
+            throw new IllegalStateException("File " + file.getAbsolutePath() + " was not found");
+        }
+        log.info("File was found: {}", file.getAbsolutePath());
+
+        return new FileDownload(fileEntity.getName(),
+                                getFileContentType(fileEntity),
+                                fileEntity.getSize(),
+                                getContentDigest(fileEntity),
+                                new FileSystemResource(file));
     }
 
     //region Update file
@@ -296,6 +330,27 @@ public class FileService {
 
         return calculatedChecksum;
     }
+
+    //endregion
+
+    //region Prepare download
+
+    private MediaType getFileContentType(FileMetadata metadata) {
+        return metadata.getContentType() != null
+                ? MediaType.parseMediaType(metadata.getContentType())
+                : MediaType.APPLICATION_OCTET_STREAM;
+    }
+
+    private String getContentDigest(FileMetadata metadata) {
+        byte[] digest = HexFormat.of().parseHex(metadata.getChecksum());
+        return "sha-256=:" + Base64.getEncoder().encodeToString(digest) + ":";
+    }
+
+    public record FileDownload(String name,
+                               MediaType contentType,
+                               long size,
+                               String contentDigest,
+                               Resource resource) {}
 
     //endregion
 }

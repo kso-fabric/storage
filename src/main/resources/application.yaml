@@ -25,10 +25,6 @@ spring:
       hibernate:
         format_sql: true
 
-  http:
-    converters:
-      preferred-json-mapper: jackson2
-
 cz:
   anderle:
     fabric:

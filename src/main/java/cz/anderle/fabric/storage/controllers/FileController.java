@@ -5,14 +5,16 @@ import cz.anderle.fabric.storage.api.model.FileListResponse;
 import cz.anderle.fabric.storage.api.model.FileMetadata;
 import cz.anderle.fabric.storage.api.model.UpdateItemRequest;
 import cz.anderle.fabric.storage.services.FileService;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -55,25 +57,25 @@ public class FileController implements FileApi {
     }
 
     @Override
-    public ResponseEntity<Void> downloadFile(UUID id) {
-        return FileApi.super.downloadFile(id);
-//        FileMetadata metadata = fileService.getFileMetadata(id);
-//
-//        StreamingResponseBody stream = output -> {
-//            try (InputStream input = fileService.getFileContent(fileId)) {
-//                input.transferTo(output);
-//            }
-//        };
-//
-//        return ResponseEntity.ok()
-//                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-//                .header(HttpHeaders.CONTENT_DISPOSITION,
-//                        "attachment; filename=\"" + metadata.name() + "\"")
-//                .body(stream);
+    public ResponseEntity<Resource> downloadFile(UUID id) {
+        var fileDownload = fileService.prepareDownload(id);
+
+        return ResponseEntity.ok()
+                .contentType(fileDownload.contentType())
+                .contentLength(fileDownload.size())
+                .header("Content-Digest", fileDownload.contentDigest())
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(fileDownload.name(), StandardCharsets.UTF_8)
+                                .build()
+                                .toString()
+                )
+                .body(fileDownload.resource());
     }
 
     @Override
     public ResponseEntity<FileMetadata> getFile(UUID id) {
-        return FileApi.super.getFile(id);
+        return ResponseEntity.ok(fileService.getFile(id));
     }
 }
