@@ -18,8 +18,8 @@ public interface DirectoryRepository extends JpaRepository<DirectoryEntity, UUID
     WHERE d.parent.id = :parentId
     ORDER BY d.id
     """)
-    List<UUID> findDirectoryIdsByParentId(
-            UUID parentId,
-            Pageable pageable
-    );
+    List<UUID> findDirectoryIdsByParent_Id(UUID parentId,
+                                           Pageable pageable);
+
+    Boolean existsByParent_Id(UUID parentId);
 }

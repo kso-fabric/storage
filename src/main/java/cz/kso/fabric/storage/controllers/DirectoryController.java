@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.UUID;
 
 @RestController
@@ -38,8 +40,12 @@ public class DirectoryController implements DirectoryApi {
     }
 
     @Override
-    public ResponseEntity<Void> deleteDirectory(UUID id) {
-        directoryService.deleteDirectory(id);
+    public ResponseEntity<Void> deleteDirectory(UUID id, Boolean recursive) {
+        try {
+            directoryService.deleteDirectory(id, recursive);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         return ResponseEntity.noContent().build();
     }
 }

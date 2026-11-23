@@ -5,6 +5,7 @@ import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
 import cz.kso.fabric.storage.api.model.DirectoryMetadata;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
+import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
@@ -64,7 +65,7 @@ public class DirectoryServiceTests extends TestBase {
     // region Create
 
     @Test
-    void createDirectory_shouldCreateInRoot() {
+    void createDirectory_InRoot_ShouldCreate() {
         var created = createDirectory("Root directory", null);
 
         Assertions.assertNotNull(created.getId());
@@ -73,7 +74,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void createDirectory_shouldCreateChildDirectory() {
+    void createDirectory_ChildDirectory_ShouldCreate() {
         var parent = createDirectory("Parent", null);
         var child = createDirectory("Child", parent.getId());
 
@@ -85,7 +86,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void createDirectory_shouldFailForUnknownParent() {
+    void createDirectory_ForUnknownParent_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
         Assertions.assertThrows(
@@ -99,7 +100,7 @@ public class DirectoryServiceTests extends TestBase {
     // region Get
 
     @Test
-    void getDirectory_shouldReturnExistingDirectory() {
+    void getDirectory_ExistingDirectory_ShouldReturn() {
         var created = createDirectory("Documents", null);
 
         var result = directoryService.getDirectory(created.getId());
@@ -109,7 +110,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void getDirectory_shouldFailForUnknownId() {
+    void getDirectory_ForUnknownId_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
         Assertions.assertThrows(
@@ -120,13 +121,13 @@ public class DirectoryServiceTests extends TestBase {
 
     // endregion
 
-    // region Delete
+    // region Delete recursive
 
     @Test
-    void deleteDirectory_shouldDeleteEmptyDirectory() {
+    void deleteDirectory_EmptyDirectoryRecursive_ShouldDelete() throws IOException {
         var directory = createDirectory("Empty", null);
 
-        directoryService.deleteDirectory(directory.getId());
+        directoryService.deleteDirectory(directory.getId(), true);
 
         Assertions.assertFalse(
                 directoryRepository.existsById(directory.getId())
@@ -134,32 +135,32 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void deleteDirectory_shouldFailForUnknownId() {
+    void deleteDirectory_ForUnknownIdRecursive_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
         Assertions.assertThrows(
                 NotFoundException.class,
-                () -> directoryService.deleteDirectory(unknownId)
+                () -> directoryService.deleteDirectory(unknownId, true)
         );
     }
 
     @Test
-    void deleteDirectory_shouldRejectRootDeletion() {
+    void deleteDirectory_RootDeletionRecursive_ShouldReject() {
         Assertions.assertThrows(
                 BadRequestException.class,
-                () -> directoryService.deleteDirectory(null)
+                () -> directoryService.deleteDirectory(null, true)
         );
     }
 
     @Test
-    void deleteDirectory_shouldDeleteFilesFromDatabaseAndDisk() throws IOException {
+    void deleteDirectory_FilesFromDatabaseAndDiskRecursive_ShouldDelete() throws IOException {
 
         var directory = createDirectory("Files", null);
 
         UUID firstFile = uploadFile(directory.getId(), "first.txt");
         UUID secondFile = uploadFile(directory.getId(), "second.txt");
 
-        directoryService.deleteDirectory(directory.getId());
+        directoryService.deleteDirectory(directory.getId(), true);
 
         assertFileDeleted(firstFile);
         assertFileDeleted(secondFile);
@@ -170,7 +171,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void deleteDirectory_shouldDeleteNestedDirectoriesAndFiles() throws IOException {
+    void deleteDirectory_NestedDirectoriesAndFilesRecursive_ShouldDelete() throws IOException {
 
         var root = createDirectory("Root", null);
         var child = createDirectory("Child", root.getId());
@@ -183,7 +184,7 @@ public class DirectoryServiceTests extends TestBase {
                 "grandchild.txt"
         );
 
-        directoryService.deleteDirectory(root.getId());
+        directoryService.deleteDirectory(root.getId(), true);
 
         for (UUID id : List.of(
                 root.getId(),
@@ -199,7 +200,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void deleteDirectory_shouldDeleteMoreThanOnePageOfFiles() throws IOException {
+    void deleteDirectory_MoreThanOnePageOfFilesRecursive_ShouldDelete() throws IOException {
 
         var directory = createDirectory("Many files", null);
 
@@ -212,7 +213,7 @@ public class DirectoryServiceTests extends TestBase {
             ));
         }
 
-        directoryService.deleteDirectory(directory.getId());
+        directoryService.deleteDirectory(directory.getId(), true);
 
         Assertions.assertFalse(
                 directoryRepository.existsById(directory.getId())
@@ -224,7 +225,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void deleteDirectory_shouldDeleteMoreThanOnePageOfSubdirectories() {
+    void deleteDirectory_MoreThanOnePageOfSubdirectoriesRecursive_ShouldDelete() throws IOException {
         var parent = createDirectory("Parent", null);
 
         List<UUID> childIds = new ArrayList<>();
@@ -237,7 +238,7 @@ public class DirectoryServiceTests extends TestBase {
             childIds.add(child.getId());
         }
 
-        directoryService.deleteDirectory(parent.getId());
+        directoryService.deleteDirectory(parent.getId(), true);
 
         Assertions.assertFalse(
                 directoryRepository.existsById(parent.getId())
@@ -251,7 +252,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     @Test
-    void deleteDirectory_shouldNotDeleteSiblingDirectories() throws IOException {
+    void deleteDirectory_SiblingDirectoriesRecursive_ShouldNotDelete() throws IOException {
 
         var parent = createDirectory("Parent", null);
         var first = createDirectory("First", parent.getId());
@@ -260,7 +261,7 @@ public class DirectoryServiceTests extends TestBase {
         UUID firstFile = uploadFile(first.getId(), "first.txt");
         UUID secondFile = uploadFile(second.getId(), "second.txt");
 
-        directoryService.deleteDirectory(first.getId());
+        directoryService.deleteDirectory(first.getId(), true);
 
         Assertions.assertFalse(directoryRepository.existsById(first.getId()));
         Assertions.assertTrue(directoryRepository.existsById(second.getId()));
@@ -276,6 +277,53 @@ public class DirectoryServiceTests extends TestBase {
 
     // endregion
 
+    //region Delete
+
+    @Test
+    void deleteDirectory_EmptyDirectory_ShouldDelete() throws IOException {
+        var directory = createDirectory("Empty", null);
+
+        directoryService.deleteDirectory(directory.getId(), false);
+
+        Assertions.assertFalse(
+                directoryRepository.existsById(directory.getId())
+        );
+    }
+
+    @Test
+    void deleteDirectory_DirectoryWithFile_ShouldReject() throws IOException {
+        var fileName = "file.txt";
+        var directory = createDirectory("notEmpty", null);
+        var fileId = uploadFile(directory.getId(), fileName);
+
+        Assertions.assertTrue(Files.exists(Path.of(storageProperties.getDiscRoot(), fileId.toString())));
+
+        Assertions.assertThrows(
+                ConflictException.class,
+                () -> directoryService.deleteDirectory(directory.getId(), false)
+        );
+
+        Assertions.assertTrue(directoryRepository.existsById(directory.getId()));
+        Assertions.assertTrue(fileRepository.existsByDirectory_IdAndName(directory.getId(), fileName));
+        Assertions.assertTrue(Files.exists(Path.of(storageProperties.getDiscRoot(), fileId.toString())));
+    }
+
+    @Test
+    void deleteDirectory_DirectoryWithDirectory_ShouldReject() {
+        var directory = createDirectory("notEmpty", null);
+        var dirIn = createDirectory("emptyIn", directory.getId());
+
+        Assertions.assertThrows(
+                ConflictException.class,
+                () -> directoryService.deleteDirectory(directory.getId(), false)
+        );
+
+        Assertions.assertTrue(directoryRepository.existsById(directory.getId()));
+        Assertions.assertTrue(directoryRepository.existsById(dirIn.getId()));
+    }
+
+    //endregion
+
     // region Helpers
 
     private DirectoryMetadata createDirectory(String name, UUID parentId) {
@@ -290,9 +338,7 @@ public class DirectoryServiceTests extends TestBase {
     }
 
     private UUID uploadFile(UUID directoryId, String name) throws IOException {
-
-        byte[] content = ("Content of " + name)
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] content = ("Content of " + name).getBytes(StandardCharsets.UTF_8);
 
         var uploaded = fileService.uploadFile(
                 name,

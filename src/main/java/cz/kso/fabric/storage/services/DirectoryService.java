@@ -6,6 +6,7 @@ import cz.kso.fabric.storage.api.model.UpdateItemRequest;
 import cz.kso.fabric.storage.entities.DirectoryEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
+import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.mappers.DirectoryMapper;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
@@ -80,10 +81,10 @@ public class DirectoryService {
         mapperUtils.updateDirectoryIfPresent(request.getDirectoryId(), dirEntity::setParent);
         mapperUtils.updateMetadataIfPresent(request, dirEntity);
 
-        return new DirectoryMetadata();
+        return DirectoryMapper.toDto(dirEntity);
     }
 
-    public void deleteDirectory(UUID id) {
+    public void deleteDirectory(UUID id, Boolean recursive) throws IOException {
         log.info("Deleting directory: {}", id);
 
         // TODO authorization
@@ -96,11 +97,15 @@ public class DirectoryService {
             throw new NotFoundException("Directory", id);
         }
 
-        try {
+        var hasItems = directoryRepository.existsByParent_Id(id) || fileRepository.existsByDirectory_Id(id);
+
+        if (hasItems && !Boolean.TRUE.equals(recursive)) {
+            throw new ConflictException("Directory %s is not empty and recursive is not allowed", id);
+        }
+
+        if (Boolean.TRUE.equals(recursive)) {
             deleteDirectoryFiles(id);
             deleteDirectoriesInParent(id);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
 
         directoryRepository.deleteById(id);
@@ -112,8 +117,8 @@ public class DirectoryService {
         var firstPage = PageRequest.of(0, 100);
 
         while (true) {
-            var fileIds = fileRepository.findFileIdsByDirectoryId(directoryId,
-                                                                  firstPage);
+            var fileIds = fileRepository.findFileIdsByDirectory_Id(directoryId,
+                                                                   firstPage);
 
             if (fileIds.isEmpty()) {
                 break;
@@ -125,11 +130,11 @@ public class DirectoryService {
         }
     }
 
-    private void deleteDirectoriesInParent(UUID parentId) {
+    private void deleteDirectoriesInParent(UUID parentId) throws IOException {
         var firstPage = PageRequest.of(0, 100);
 
         while (true) {
-            var dirIds = directoryRepository.findDirectoryIdsByParentId(parentId,
+            var dirIds = directoryRepository.findDirectoryIdsByParent_Id(parentId,
                                                                          firstPage);
 
             if (dirIds.isEmpty()) {
@@ -137,7 +142,7 @@ public class DirectoryService {
             }
 
             for (UUID dirId : dirIds) {
-                deleteDirectory(dirId);
+                deleteDirectory(dirId, true);
             }
         }
     }

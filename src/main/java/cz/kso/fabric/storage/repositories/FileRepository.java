@@ -25,6 +25,8 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
 
     Boolean existsByDirectory_IdAndName(UUID directoryId, String name);
 
+    Boolean existsByDirectory_Id(UUID directoryId);
+
     @Query("""
             SELECT f.id
             FROM FileEntity f
@@ -48,5 +50,5 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
             WHERE f.directory.id = :directoryId
             ORDER BY f.id
             """)
-    List<UUID> findFileIdsByDirectoryId(UUID directoryId, Pageable pageable);
+    List<UUID> findFileIdsByDirectory_Id(UUID directoryId, Pageable pageable);
 }

@@ -144,6 +144,41 @@ paths:
                 type: string
                 format: binary
         "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [ File ]
+      operationId: updateFileContent
+      summary: Update file content
+      parameters:
+        - name: X-Content-SHA256
+          in: header
+          description: Expected SHA-256 checksum in hexadecimal
+          schema: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+        - name: X-Content-Type
+          in: header
+          description: File Content-Type
+          schema: { type: string, example: "image/x-canon-cr2" }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "204":
+          description: File content replaced successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          description: File exceeds allowed size
+        "422":
+          description: Checksum mismatch
+        "507":
+          description: Insufficient storage space
   /directories:
     post:
       tags: [ Directory ]
@@ -195,11 +230,19 @@ paths:
     delete:
       tags: [ Directory ]
       operationId: deleteDirectory
-      summary: Delete an empty directory
+      summary: Delete a directory
+      parameters:
+        - name: recursive
+          in: query
+          required: false
+          description: Recursively delete directory contents
+          schema:
+            type: boolean
+            default: false
       responses:
         "204": { description: Directory deleted }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Directory is not empty }
+        "409": { description: Directory is not empty and recursive is on }
   /storage:
     get:
       tags: [ Storage ]
