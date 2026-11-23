@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -79,6 +80,7 @@ public class FileService {
         return resp;
     }
 
+    @Transactional
     public FileMetadata getFile(UUID id) {
         log.info("Getting file: {}", id);
         // TODO authorization
@@ -124,7 +126,7 @@ public class FileService {
                                         directoryId);
         }
 
-        log.info("Content-Length: {}", contentLength);
+        log.info("Upload Content-Length: {}", contentLength);
         if (contentLength >= 0 && !storageService.hasEnoughSpace(contentLength)) {
             throw new InsufficientStorageException();
         }
@@ -137,30 +139,100 @@ public class FileService {
         fileEntity.setMetadata(new MetadataEntity());
 
         var path = getFilePath(fileEntity);
-        var digest = getDigest();
+        writeFile(fileEntity, path, sha256, input);
+
+        transactionTemplate.executeWithoutResult(_ -> {
+            entityManager.persist(fileEntity);
+            entityManager.flush();
+        });
+
+        log.info("Uploaded file {}", fileEntity.getId());
+        return FileMapper.toDto(fileEntity);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public void updateFileContent(UUID id,
+                                  String sha256,
+                                  String contentType,
+                                  long contentLength,
+                                  InputStream input) throws IOException {
+        log.info("Updating file: {} content", id);
+
+        if (contentLength >= 0 && !storageService.hasEnoughSpace(contentLength)) {
+            throw new InsufficientStorageException();
+        }
+
+        var fileEntity = fileRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("File", id));
+
+        var origPath = getFilePath(fileEntity);
+        var tempPath = Files.createTempFile(origPath.getParent(), id + "-", ".tmp");
+        var backupPath = Files.createTempFile(origPath.getParent(), id + "-", ".bak");
+
+        boolean replaced = false;
+        boolean committed = false;
 
         try {
-            try (var digestInput = new DigestInputStream(input, digest)) {
-                Files.copy(digestInput, path);
-            }
+            // writeFile() uses Files.copy(), which requires
+            // the destination not to exist.
+            Files.delete(tempPath);
 
-            fileEntity.setChecksum(calculateChecksum(sha256, digest));
-            fileEntity.setSize(Files.size(path));
+            // Write and validate the new content without changing
+            // the managed entity.
+            var newContent = new FileEntity();
+            writeFile(newContent, tempPath, sha256, input);
 
-            transactionTemplate.executeWithoutResult(status -> {
-                entityManager.persist(fileEntity);
-                entityManager.flush();
+            // Preserve the original content for rollback.
+            Files.copy(origPath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Replace the physical content.
+            Files.move(
+                    tempPath,
+                    origPath,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+            replaced = true;
+
+            // The transaction is committed before executeWithoutResult returns.
+            transactionTemplate.executeWithoutResult(_ -> {
+                var entity = fileRepository.findById(id)
+                        .orElseThrow(() -> new NotFoundException("File", id));
+
+                entity.setChecksum(newContent.getChecksum());
+                entity.setSize(newContent.getSize());
+                entity.setContentType(contentType);
+
+                fileRepository.saveAndFlush(entity);
             });
 
-            log.info("Uploaded file {}", fileEntity.getId());
-            return FileMapper.toDto(fileEntity);
+            committed = true;
+            log.info("File {} content updated successfully", id);
+
         } catch (IOException | RuntimeException e) {
-            try {
-                Files.deleteIfExists(path);
-            } catch (IOException cleanupException) {
-                e.addSuppressed(cleanupException);
+            if (replaced && !committed) {
+                try {
+                    Files.move(
+                            backupPath,
+                            origPath,
+                            StandardCopyOption.ATOMIC_MOVE,
+                            StandardCopyOption.REPLACE_EXISTING
+                    );
+                } catch (IOException restoreException) {
+                    e.addSuppressed(restoreException);
+                    log.error("Failed to restore original content of file {}", id,
+                              restoreException);
+                }
             }
+
             throw e;
+
+        } finally {
+            Files.deleteIfExists(tempPath);
+
+            if (committed || !replaced) {
+                Files.deleteIfExists(backupPath);
+            }
         }
     }
 
@@ -229,6 +301,29 @@ public class FileService {
         }
 
         return calculatedChecksum;
+    }
+
+    private void writeFile(FileEntity fileEntity,
+                           Path path,
+                           String sha256,
+                           InputStream input) throws IOException {
+        var digest = getDigest();
+
+        try {
+            try (var digestInput = new DigestInputStream(input, digest)) {
+                Files.copy(digestInput, path);
+            }
+
+            fileEntity.setChecksum(calculateChecksum(sha256, digest));
+            fileEntity.setSize(Files.size(path));
+        } catch (IOException | RuntimeException e) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException cleanupException) {
+                e.addSuppressed(cleanupException);
+            }
+            throw e;
+        }
     }
 
     //endregion

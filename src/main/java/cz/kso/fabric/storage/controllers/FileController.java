@@ -6,7 +6,10 @@ import cz.kso.fabric.storage.api.model.FileMetadata;
 import cz.kso.fabric.storage.api.model.UpdateItemRequest;
 import cz.kso.fabric.storage.services.FileService;
 import org.springframework.core.io.Resource;
-import org.springframework.http.*;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -54,6 +57,23 @@ public class FileController implements FileApi {
                                                  xContentType,
                                                  body.contentLength(),
                                                  input));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public ResponseEntity<Void> updateFileContent(UUID id,
+                                                  Resource body,
+                                                  String xContentSHA256,
+                                                  String xContentType) {
+        try (InputStream input = body.getInputStream()) {
+            fileService.updateFileContent(id,
+                                          xContentSHA256,
+                                          xContentType,
+                                          body.contentLength(),
+                                          input);
+            return ResponseEntity.noContent().build();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
