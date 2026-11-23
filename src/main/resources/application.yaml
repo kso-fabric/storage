@@ -30,3 +30,4 @@ cz:
     fabric:
       storage:
         disc-root: "C:/Users/Jakub Anderle/IdeaProjects/storage/disc"
+        integrity-batch-size: 100

@@ -1,20 +1,23 @@
 package cz.kso.fabric.storage.repositories;
 
 import cz.kso.fabric.storage.entities.FileEntity;
+import cz.kso.fabric.storage.repositories.projections.FileSizeProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Repository
 public interface FileRepository extends JpaRepository<FileEntity, UUID> {
 
-    Page<FileEntity> findByDirectory_Id(UUID directoryId,
-                                        Pageable pageable);
+    Page<FileEntity> findByDirectory_Id(UUID directoryId, Pageable pageable);
 
     Page<FileEntity> findByDirectoryIsNull(Pageable pageable);
 
@@ -23,13 +26,27 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
     Boolean existsByDirectory_IdAndName(UUID directoryId, String name);
 
     @Query("""
-    SELECT f.id
+            SELECT f.id
+            FROM FileEntity f
+            """
+    )
+    Stream<UUID> streamAllIds();
+
+    @Query("""
+    SELECT new cz.kso.fabric.storage.repositories.projections.FileSizeProjection(f.id, f.size)
     FROM FileEntity f
-    WHERE f.directory.id = :directoryId
-    ORDER BY f.id
+    WHERE f.id IN :ids
     """)
-    List<UUID> findFileIdsByDirectoryId(
-            UUID directoryId,
-            Pageable pageable
-    );
+    List<FileSizeProjection> findSizesByIds(@Param("ids") Collection<UUID> ids);
+
+    @Query("SELECT COALESCE(SUM(f.size), 0) FROM FileEntity f")
+    long getTotalFileSize();
+
+    @Query("""
+            SELECT f.id
+            FROM FileEntity f
+            WHERE f.directory.id = :directoryId
+            ORDER BY f.id
+            """)
+    List<UUID> findFileIdsByDirectoryId(UUID directoryId, Pageable pageable);
 }

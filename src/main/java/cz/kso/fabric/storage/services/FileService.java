@@ -9,13 +9,14 @@ import cz.kso.fabric.storage.entities.FileEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
+import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.mappers.FileMapper;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
-import cz.kso.fabric.storage.repositories.TagRepository;
 import cz.kso.fabric.storage.utils.MapperUtils;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -40,25 +41,16 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FileService {
 
     private final StorageProperties storageProperties;
     private final FileRepository fileRepository;
     private final DirectoryRepository directoryRepository;
-    private final TagRepository tagRepository;
+    private final StorageService storageService;
     private final MapperUtils mapperUtils;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
-
-    FileService(StorageProperties storageProperties, FileRepository fileRepository, DirectoryRepository directoryRepository, TagRepository tagRepository, MapperUtils mapperUtils, EntityManager entityManager, TransactionTemplate transactionTemplate) {
-        this.storageProperties = storageProperties;
-        this.fileRepository = fileRepository;
-        this.directoryRepository = directoryRepository;
-        this.tagRepository = tagRepository;
-        this.mapperUtils = mapperUtils;
-        this.entityManager = entityManager;
-        this.transactionTemplate = transactionTemplate;
-    }
 
     @Transactional(readOnly = true)
     public FileListResponse listFiles(UUID directoryId, Integer limit, Integer offset) {
@@ -132,9 +124,9 @@ public class FileService {
                                         directoryId);
         }
 
-        if (contentLength >= 0) {
-            log.info("Content-Length: {}", contentLength);
-            // TODO add free space check
+        log.info("Content-Length: {}", contentLength);
+        if (contentLength >= 0 && !storageService.hasEnoughSpace(contentLength)) {
+            throw new InsufficientStorageException();
         }
 
         var fileEntity = new FileEntity();

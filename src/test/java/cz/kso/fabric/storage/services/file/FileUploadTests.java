@@ -3,6 +3,9 @@ package cz.kso.fabric.storage.services.file;
 import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.entities.DirectoryEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
+import cz.kso.fabric.storage.exceptions.ConflictException;
+import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
@@ -54,7 +57,7 @@ public class FileUploadTests extends TestBase {
     private TransactionTemplate transactionTemplate;
 
     @Test
-    void uploadFile_shouldSaveFileToRoot() throws IOException {
+    void uploadFile_FileToRoot_ShouldSave() throws IOException {
         byte[] content = "Ahoj :)".getBytes(StandardCharsets.UTF_8);
 
         var response = fileService.uploadFile(
@@ -68,7 +71,7 @@ public class FileUploadTests extends TestBase {
 
         Assertions.assertNotNull(response.getId());
         Assertions.assertEquals("test.txt", response.getName());
-        Assertions.assertEquals((long) content.length, response.getSize());
+        Assertions.assertEquals(content.length, response.getSize());
         Assertions.assertEquals(sha256(content), response.getChecksum());
 
         var entity = fileRepository.findById(response.getId()).orElseThrow();
@@ -83,7 +86,7 @@ public class FileUploadTests extends TestBase {
     }
 
     @Test
-    void uploadFile_shouldSaveFileToDirectory() throws IOException {
+    void uploadFile_FileToDirectory_ShouldSave() throws IOException {
         var directory = createDirectory("Astrophotography");
         byte[] content = "M42".getBytes(StandardCharsets.UTF_8);
 
@@ -111,7 +114,7 @@ public class FileUploadTests extends TestBase {
     }
 
     @Test
-    void uploadFile_shouldAcceptMatchingChecksum() throws IOException {
+    void uploadFile_MatchingChecksum_ShouldAccept() throws IOException {
         byte[] content = "Hello Fabric".getBytes(StandardCharsets.UTF_8);
         String checksum = sha256(content);
 
@@ -129,15 +132,14 @@ public class FileUploadTests extends TestBase {
     }
 
     @Test
-    void uploadFile_shouldRejectChecksumMismatch() {
+    void uploadFile_ChecksumMismatch_ShouldReject() {
         byte[] content = "Invalid checksum".getBytes(StandardCharsets.UTF_8);
         String wrongChecksum = "0".repeat(64);
 
         long countBefore = fileRepository.count();
         long filesBefore = countStoredFiles();
 
-        // Nahraď RuntimeException konkrétní ChecksumMismatchException.
-        Assertions.assertThrows(RuntimeException.class, () ->
+        Assertions.assertThrows(ChecksumMismatchException.class, () ->
                 fileService.uploadFile(
                         "invalid.txt",
                         null,
@@ -153,7 +155,7 @@ public class FileUploadTests extends TestBase {
     }
 
     @Test
-    void uploadFile_shouldRejectNonexistentDirectory() {
+    void uploadFile_shouldRejectNonexistentDirectory_ShouldReject() {
         byte[] content = "Test".getBytes(StandardCharsets.UTF_8);
 
         long countBefore = fileRepository.count();
@@ -175,9 +177,7 @@ public class FileUploadTests extends TestBase {
     }
 
     @Test
-    void uploadFile_shouldRejectDuplicateNameInSameDirectory()
-            throws IOException {
-
+    void uploadFile_DuplicateNameInSameDirectory_ShouldReject() throws IOException {
         byte[] content = "First file".getBytes(StandardCharsets.UTF_8);
 
         var first = fileService.uploadFile(
@@ -192,8 +192,7 @@ public class FileUploadTests extends TestBase {
         long countBefore = fileRepository.count();
         long filesBefore = countStoredFiles();
 
-        // Nahraď RuntimeException konkrétní ConflictException.
-        Assertions.assertThrows(RuntimeException.class, () ->
+        Assertions.assertThrows(ConflictException.class, () ->
                 fileService.uploadFile(
                         "duplicate.txt",
                         null,
@@ -211,6 +210,19 @@ public class FileUploadTests extends TestBase {
                 content,
                 Files.readAllBytes(filePath(first.getId()))
         );
+    }
+
+    @Test
+    void uploadFile_FileTooBig_ShouldReject() {
+        byte[] content = "Ahoj :)".getBytes(StandardCharsets.UTF_8);
+
+        Assertions.assertThrows(InsufficientStorageException.class, () ->
+                fileService.uploadFile("test.txt",
+                                       null,
+                                       null,
+                                       null,
+                                       50000000000000000L,
+                                       new ByteArrayInputStream(content)));
     }
 
     private DirectoryEntity createDirectory(String name) {

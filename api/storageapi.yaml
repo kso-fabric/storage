@@ -211,6 +211,28 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/StorageInfo" }
+  /storage/integrity:
+    get:
+      tags:
+        - Storage
+      operationId: getStorageIntegrity
+      summary: Check storage integrity
+      description: |
+        Performs a full scan of the storage directory and compares
+        physical files with database records.
+
+        This operation may be slow for large storage volumes.
+        File checksums are not recalculated.
+        No files or database records are modified.
+      responses:
+        '200':
+          description: Storage integrity report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageIntegrity'
+        '500':
+          description: Internal server error
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer }
@@ -323,11 +345,71 @@ components:
           description: Arbitrary JSON metadata associated with the directory.
     StorageInfo:
       type: object
-      required: [ totalBytes, usedBytes, freeBytes ]
+      required: [ managedBytes, usedBytes, usableBytes, unallocatedBytes, totalBytes ]
       properties:
-        totalBytes: { type: integer, format: int64 }
-        usedBytes: { type: integer, format: int64 }
-        freeBytes: { type: integer, format: int64 }
+        managedBytes:
+          description: 'Total logical size of files managed by Storage'
+          type: integer
+          format: int64
+        usedBytes:
+          description: 'Total allocated space on the filesystem'
+          type: integer
+          format: int64
+        usableBytes:
+          description: 'Space available to the Storage process'
+          type: integer
+          format: int64
+        unallocatedBytes:
+          description: 'Total unallocated space on the filesystem'
+          type: integer
+          format: int64
+        blockSize:
+          description: 'Filesystem block size in bytes'
+          type: integer
+          format: int64
+        totalBytes:
+          description: 'Total filesystem capacity in bytes'
+          type: integer
+          format: int64
+    StorageIntegrity:
+      type: object
+      required:
+        - databaseFiles
+        - diskFiles
+        - missingFiles
+        - orphanedFiles
+        - sizeMismatches
+        - databaseBytes
+        - diskBytes
+      properties:
+        databaseFiles:
+          type: integer
+          format: int64
+          description: Number of files registered in the database
+        diskFiles:
+          type: integer
+          format: int64
+          description: Number of regular files found in the storage directory
+        missingFiles:
+          type: integer
+          format: int64
+          description: Number of database files missing from disk
+        orphanedFiles:
+          type: integer
+          format: int64
+          description: Number of disk files without a database record
+        sizeMismatches:
+          type: integer
+          format: int64
+          description: Number of files whose actual size differs from the database
+        databaseBytes:
+          type: integer
+          format: int64
+          description: Sum of file sizes registered in the database
+        diskBytes:
+          type: integer
+          format: int64
+          description: Sum of actual file sizes found on disk
     ErrorResponse:
       type: object
       required: [ title, status, detail ]
