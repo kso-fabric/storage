@@ -157,7 +157,7 @@ public class FileService {
                                   long contentLength,
                                   InputStream input) throws IOException {
         log.info("Updating file: {} content", id);
-
+        // TODO authorization
         if (contentLength >= 0 && !storageService.hasEnoughSpace(contentLength)) {
             throw new InsufficientStorageException();
         }
