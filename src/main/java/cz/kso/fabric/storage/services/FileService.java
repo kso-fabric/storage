@@ -3,13 +3,10 @@ package cz.kso.fabric.storage.services;
 import cz.kso.fabric.storage.api.model.FileListResponse;
 import cz.kso.fabric.storage.api.model.FileMetadata;
 import cz.kso.fabric.storage.api.model.UpdateItemRequest;
-import cz.kso.fabric.storage.api.model.UpdateTagItem;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.entities.DirectoryEntity;
 import cz.kso.fabric.storage.entities.FileEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
-import cz.kso.fabric.storage.entities.TagEntity;
-import cz.kso.fabric.storage.exceptions.BadRequestException;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
@@ -37,8 +34,9 @@ import java.nio.file.Path;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
-import java.util.*;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -48,14 +46,16 @@ public class FileService {
     private final FileRepository fileRepository;
     private final DirectoryRepository directoryRepository;
     private final TagRepository tagRepository;
+    private final MapperUtils mapperUtils;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
-    FileService(StorageProperties storageProperties, FileRepository fileRepository, DirectoryRepository directoryRepository, TagRepository tagRepository, EntityManager entityManager, TransactionTemplate transactionTemplate) {
+    FileService(StorageProperties storageProperties, FileRepository fileRepository, DirectoryRepository directoryRepository, TagRepository tagRepository, MapperUtils mapperUtils, EntityManager entityManager, TransactionTemplate transactionTemplate) {
         this.storageProperties = storageProperties;
         this.fileRepository = fileRepository;
         this.directoryRepository = directoryRepository;
         this.tagRepository = tagRepository;
+        this.mapperUtils = mapperUtils;
         this.entityManager = entityManager;
         this.transactionTemplate = transactionTemplate;
     }
@@ -104,18 +104,8 @@ public class FileService {
                 .orElseThrow(() -> new NotFoundException("File", id));
 
         MapperUtils.applyIfPresent(request.getName(), fileEntity::setName);
-
-        if (request.getDirectoryId().isPresent()) {
-            var dirId = request.getDirectoryId().get();
-            DirectoryEntity dirEntity = null;
-            if (dirId != null) {
-                dirEntity = directoryRepository.findById(dirId)
-                        .orElseThrow(() -> new NotFoundException("Directory", dirId));
-            }
-            fileEntity.setDirectory(dirEntity);
-        }
-
-        updateMetadata(request, fileEntity);
+        mapperUtils.updateDirectoryIfPresent(request.getDirectoryId(), fileEntity::setDirectory);
+        mapperUtils.updateMetadataIfPresent(request, fileEntity);
 
         return FileMapper.toDto(fileEntity);
     }
@@ -219,104 +209,6 @@ public class FileService {
             log.warn("File {} existed in database but not on disk", id);
         }
     }
-
-    //region Update file
-
-    private void updateMetadata(UpdateItemRequest updateFileRequest, FileEntity entity) {
-        if (updateFileRequest.getAdditionalData().isPresent()) {
-            entity.setUpdatedAt(Instant.now());
-
-            var updateMetadataRequest = updateFileRequest.getAdditionalData().get();
-            if (updateMetadataRequest == null) {
-                log.error("Metadata update object cannot be null");
-                throw new BadRequestException();
-            }
-
-            var metadataEntity = entity.getMetadata();
-            MapperUtils.applyIfPresent(updateMetadataRequest.getDescription(), metadataEntity::setDescription);
-            MapperUtils.applyIfPresent(updateMetadataRequest.getCustom(), metadataEntity::setCustom);
-
-            if (updateMetadataRequest.getTags() != null) {
-                validateUpdateTags(updateMetadataRequest.getTags());
-
-                for (var updateTag : updateMetadataRequest.getTags()) {
-                    var tagEntity = findTag(updateTag, metadataEntity);
-
-                    if (UpdateTagItem.ActionEnum.ADD.equals(updateTag.getAction())
-                            && tagEntity == null) {
-                        addTag(updateTag, metadataEntity);
-                    }
-
-                    if (UpdateTagItem.ActionEnum.DELETE.equals(updateTag.getAction())
-                            && tagEntity != null) {
-                        deleteTag(tagEntity, metadataEntity);
-                    }
-                }
-            }
-        }
-    }
-
-    private TagEntity findTag(UpdateTagItem updateTag, MetadataEntity metadataEntity) {
-        var matchColl = metadataEntity.getTags().stream()
-                .filter(x -> x.getValue().equals(updateTag.getValue()))
-                .toList();
-
-        if (matchColl.size() > 1) {
-            log.error("Tag collection for metadata={} has duplication '{}'",
-                      metadataEntity.getId(),
-                      updateTag.getValue());
-            throw new IllegalStateException("Tag collection for metadata has duplication");
-        }
-
-        return matchColl.isEmpty() ? null : matchColl.getFirst();
-    }
-
-    private void addTag(UpdateTagItem updateTag, MetadataEntity metadataEntity) {
-        var tagOpt = tagRepository.findByValue(updateTag.getValue());
-        TagEntity tagEntity;
-        if (tagOpt.isEmpty()) {
-            log.info("Adding new tag of value {}", updateTag.getValue());
-            tagEntity = new TagEntity();
-            tagEntity.setValue(updateTag.getValue());
-            tagEntity = tagRepository.save(tagEntity);
-        } else {
-            tagEntity = tagOpt.get();
-        }
-        log.info("Adding metadata {} tag {} of value {}",
-                 metadataEntity.getId(),
-                 tagEntity.getId(),
-                 tagEntity.getValue());
-        metadataEntity.getTags().add(tagEntity);
-    }
-
-    private void deleteTag(TagEntity tagEntity, MetadataEntity metadataEntity) {
-        log.info("Deleting metadata {} tag {} of value {}",
-                 metadataEntity.getId(),
-                 tagEntity.getId(),
-                 tagEntity.getValue());
-        metadataEntity.getTags().remove(tagEntity);
-    }
-
-    private void validateUpdateTags(List<UpdateTagItem> tags) {
-        Set<String> values = new HashSet<>();
-        for (var tag : tags) {
-            if (tag == null
-                    || tag.getValue() == null
-                    || tag.getValue().isBlank()
-                    || tag.getValue().length() > 100
-                    || tag.getAction() == null) {
-                log.error("Invalid null tag");
-                throw new BadRequestException();
-            }
-
-            if (!values.add(tag.getValue())) {
-                log.error("Tag change duplication");
-                throw new BadRequestException();
-            }
-        }
-    }
-
-    //endregion
 
     //region Upload file
 

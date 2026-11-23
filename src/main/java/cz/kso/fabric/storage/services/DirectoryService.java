@@ -10,6 +10,7 @@ import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.mappers.DirectoryMapper;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.utils.MapperUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,11 +26,13 @@ public class DirectoryService {
     private final DirectoryRepository directoryRepository;
     private final FileRepository fileRepository;
     private final FileService fileService;
+    private final MapperUtils mapperUtils;
 
-    public DirectoryService(DirectoryRepository directoryRepository, FileRepository fileRepository, FileService fileService) {
+    public DirectoryService(DirectoryRepository directoryRepository, FileRepository fileRepository, FileService fileService, MapperUtils mapperUtils) {
         this.directoryRepository = directoryRepository;
         this.fileRepository = fileRepository;
         this.fileService = fileService;
+        this.mapperUtils = mapperUtils;
     }
 
     @Transactional
@@ -50,12 +53,13 @@ public class DirectoryService {
         dirEntity.setParent(parentDir);
         dirEntity.setMetadata(new MetadataEntity());
 
-        dirEntity = directoryRepository.save(dirEntity);
+        dirEntity = directoryRepository.saveAndFlush(dirEntity);
 
         log.info("New directory created: {}", dirEntity.getId());
         return DirectoryMapper.toDto(dirEntity);
     }
 
+    @Transactional(readOnly = true)
     public DirectoryMetadata getDirectory(UUID id) {
         log.info("Getting directory: {}", id);
 
@@ -65,7 +69,17 @@ public class DirectoryService {
         return DirectoryMapper.toDto(dirEntity);
     }
 
+    @Transactional
     public DirectoryMetadata updateDirectory(UUID id, UpdateItemRequest request) {
+        log.info("Updating directory: {}", id);
+        // TODO authorization
+        var dirEntity = directoryRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Directory", id));
+
+        MapperUtils.applyIfPresent(request.getName(), dirEntity::setName);
+        mapperUtils.updateDirectoryIfPresent(request.getDirectoryId(), dirEntity::setParent);
+        mapperUtils.updateMetadataIfPresent(request, dirEntity);
+
         return new DirectoryMetadata();
     }
 

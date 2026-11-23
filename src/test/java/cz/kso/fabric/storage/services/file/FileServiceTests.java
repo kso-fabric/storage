@@ -1,4 +1,4 @@
-package cz.kso.fabric.storage.services;
+package cz.kso.fabric.storage.services.file;
 
 import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.api.model.UpdateItemRequest;
@@ -12,6 +12,7 @@ import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
 import cz.kso.fabric.storage.repositories.TagRepository;
+import cz.kso.fabric.storage.services.FileService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
