@@ -25,3 +25,28 @@ jobs:
 
       - name: Build and test
         run: mvn -B clean verify
+
+      - name: Check release eligibility
+        id: release
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --tags
+
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Release is allowed only from main"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+
+          elif [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "Snapshot version, skipping release"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+
+          elif git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo "Version $TAG already exists"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+
+          else
+            echo "New release: $TAG"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
