@@ -3,22 +3,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.2.0</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <groupId>cz.kso.fabric</groupId>
+        <artifactId>storage-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
-    <groupId>cz.kso.fabric</groupId>
     <artifactId>storage-server</artifactId>
-    <version>0.1.1</version>
 
-    <properties>
-        <java.version>25</java.version>
-        <openapi-generator.version>7.26.0</openapi-generator.version>
-
-        <api.path>api/storageapi.yaml</api.path>
-        <api.package>cz.kso.fabric.storage.api</api.package>
-    </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -126,8 +117,8 @@
                                 <documentationProvider>none</documentationProvider>
                                 <annotationLibrary>none</annotationLibrary>
 
-                                <apiPackage>${api.package}</apiPackage>
-                                <modelPackage>${api.package}.model</modelPackage>
+                                <apiPackage>${server.package}</apiPackage>
+                                <modelPackage>${server.package}.model</modelPackage>
                             </configOptions>
 
                             <generateApiTests>false</generateApiTests>

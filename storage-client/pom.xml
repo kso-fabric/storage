@@ -3,23 +3,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <groupId>cz.kso.fabric</groupId>
+        <artifactId>storage-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
-    <groupId>cz.kso.fabric</groupId>
-    <artifactId>storage.client</artifactId>
-    <version>0.1.0</version>
-    <name>storage-client</name>
-    <description>storage-client</description>
+    <artifactId>storage-client</artifactId>
 
-    <properties>
-        <java.version>25</java.version>
-        <openapi-generator.version>7.26.0</openapi-generator.version>
-        <client.apipath>../api/storageapi.yaml</client.apipath>
-        <client.package>cz.kso.fabric.storage.client</client.package>
-    </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -53,7 +43,7 @@
                         </goals>
                         <configuration>
 <!--                            <apiNameSuffix>Test</apiNameSuffix>-->
-                            <inputSpec>${client.apipath}</inputSpec>
+                            <inputSpec>${api.path}</inputSpec>
                             <generatorName>java</generatorName>
                             <configOptions>
                                 <apiClientName>${client.name}</apiClientName>
