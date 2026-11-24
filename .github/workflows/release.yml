@@ -33,6 +33,9 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
       - name: Build and test
         run: mvn -B clean verify
@@ -40,7 +43,7 @@ jobs:
       - name: Resolve application version
         id: version
         run: |
-          VERSION=$(mvn help:evaluate \
+          VERSION=$(mvn -N help:evaluate \
             -Dexpression=project.version \
             -q -DforceStdout)
 
@@ -97,6 +100,15 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Deploy Storage client
+        if: steps.release.outputs.publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mvn -B -pl :storage-parent,:storage-client deploy \
+            -DskipTests \
+            -DaltDeploymentRepository=github::https://maven.pkg.github.com/${{ github.repository }}
 
       - name: Update latest image tag
         if: steps.release.outputs.publish == 'true'
