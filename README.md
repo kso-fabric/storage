@@ -9,6 +9,39 @@
   - Settings -> Resources -> WSL Integration
     - allow installed WSL
 
+## Deployment
+
+Login - https://github.com/settings/tokens
+
+```bash
+docker login ghcr.io -u GITHUB_USERNAME
+#  password -> PERSONAL_TOKEN
+```
+
+```bash
+mvn clean package
+docker build -t fabric-storage:local .
+
+# list local images
+docker image ls
+
+# tag local
+docker tag fabric-storage:local ghcr.io/kso-fabric/storage:0.1.0
+docker tag fabric-storage:local ghcr.io/kso-fabric/storage:latest
+
+# push
+docker push ghcr.io/kso-fabric/storage:0.1.0
+docker push ghcr.io/kso-fabric/storage:latest
+
+# pull
+docker pull ghcr.io/kso-fabric/storage:0.1.0
+
+# validate architecture
+docker image inspect fabric-storage:local --format '{{.Os}}/{{.Architecture}}'
+```
+
+Packges - https://github.com/orgs/kso-fabric/packages
+
 ## Install Java SDK on WSL 
 
 ```bash
