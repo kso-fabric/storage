@@ -29,9 +29,9 @@ jobs:
       - name: Resolve application version
         id: version
         run: |
-          VERSION=$(mvn help:evaluate \
-          -Dexpression=project.version \
-          -q -DforceStdout)
+          VERSION=$(mvn -N help:evaluate \
+            -Dexpression=project.version \
+            -q -DforceStdout)
             
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"

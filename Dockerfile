@@ -3,7 +3,7 @@ LABEL org.opencontainers.image.source="https://github.com/kso-fabric/storage"
 
 WORKDIR /app
 
-COPY target/*.jar app.jar
+COPY storage-server/target/*.jar app.jar
 
 EXPOSE 8080
 

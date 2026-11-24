@@ -40,7 +40,7 @@ jobs:
       - name: Resolve application version
         id: version
         run: |
-          VERSION=$(mvn help:evaluate \
+          VERSION=$(mvn -N help:evaluate \
             -Dexpression=project.version \
             -q -DforceStdout)
 
