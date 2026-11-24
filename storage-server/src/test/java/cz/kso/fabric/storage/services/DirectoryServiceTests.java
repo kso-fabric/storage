@@ -9,6 +9,8 @@ import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.services.DirectoryService;
+import cz.kso.fabric.storage.services.FileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
