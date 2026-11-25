@@ -1,6 +1,6 @@
 server:
   servlet:
-    context-path: /storage/v1
+    context-path: /storage-api/v1
 
 spring:
   application:

@@ -2,11 +2,17 @@ package cz.kso.fabric.storage.controllers;
 
 import cz.kso.fabric.storage.api.DirectoryApi;
 import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
+import cz.kso.fabric.storage.api.model.DirectoryListResponse;
 import cz.kso.fabric.storage.api.model.DirectoryMetadata;
 import cz.kso.fabric.storage.api.model.UpdateItemRequest;
 import cz.kso.fabric.storage.services.DirectoryService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -20,6 +26,10 @@ public class DirectoryController implements DirectoryApi {
 
     public DirectoryController(DirectoryService directoryService) {
         this.directoryService = directoryService;
+    }
+
+    public ResponseEntity<DirectoryListResponse> listDirectory(UUID directoryId, Integer limit, Integer offset) {
+        return ResponseEntity.ok(directoryService.listDirectories(directoryId, limit, offset));
     }
 
     @Override
