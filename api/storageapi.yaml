@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Fabric file storage service.
 servers:
-  - url: /api/v1
+  - url: /storage-api/v1
 security:
   - bearerAuth: [ ]
 tags:
@@ -180,6 +180,28 @@ paths:
         "507":
           description: Insufficient storage space
   /directories:
+    get:
+      tags: [ Directory ]
+      operationId: listDirectory
+      summary: List directories in a directory
+      parameters:
+        - name: directoryId
+          in: query
+          description: Omit for root directory
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100, minimum: 1, maximum: 1000 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0, minimum: 0 }
+      responses:
+        "200":
+          description: Directory contents
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DirectoryListResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       tags: [ Directory ]
       operationId: createDirectory
@@ -374,18 +396,25 @@ components:
       required: [ name ]
       properties:
         name: { type: string, minLength: 1 }
-        parentId: { type: [ string, "null" ], format: uuid }
+        parentId: { type: string, format: uuid }
     DirectoryMetadata:
       type: object
       required: [ id, name, createdAt ]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        parentId: { type: [ string, "null" ], format: uuid }
+        parentId: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
         additionalData:
           $ref: "#/components/schemas/Metadata"
           description: Arbitrary JSON metadata associated with the directory.
+    DirectoryListResponse:
+      type: object
+      required: [ directories, total ]
+      properties:
+        directories:
+          type: array
+          items: { $ref: "#/components/schemas/DirectoryMetadata" }
     StorageInfo:
       type: object
       required: [ managedBytes, usedBytes, usableBytes, unallocatedBytes, totalBytes ]
