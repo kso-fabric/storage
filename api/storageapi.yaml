@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storage API
-  version: 0.1.0
+  version: 0.1.2
   description: Fabric file storage service.
 servers:
   - url: /storage-api/v1
@@ -415,6 +415,7 @@ components:
         directories:
           type: array
           items: { $ref: "#/components/schemas/DirectoryMetadata" }
+        total: { type: integer, format: int64 }
     StorageInfo:
       type: object
       required: [ managedBytes, usedBytes, usableBytes, unallocatedBytes, totalBytes ]

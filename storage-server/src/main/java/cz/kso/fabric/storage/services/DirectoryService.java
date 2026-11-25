@@ -1,6 +1,7 @@
 package cz.kso.fabric.storage.services;
 
 import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
+import cz.kso.fabric.storage.api.model.DirectoryListResponse;
 import cz.kso.fabric.storage.api.model.DirectoryMetadata;
 import cz.kso.fabric.storage.api.model.UpdateItemRequest;
 import cz.kso.fabric.storage.entities.DirectoryEntity;
@@ -13,7 +14,9 @@ import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.FileRepository;
 import cz.kso.fabric.storage.utils.MapperUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,33 @@ public class DirectoryService {
         this.fileRepository = fileRepository;
         this.fileService = fileService;
         this.mapperUtils = mapperUtils;
+    }
+
+    @Transactional(readOnly = true)
+    public DirectoryListResponse listDirectories(UUID directoryId, Integer limit, Integer offset) {
+        log.info("Listing directories with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
+        // TODO authorization
+        var pageable = PageRequest.of(
+                offset / limit,
+                limit,
+                Sort.by(Sort.Order.asc("name"),
+                        Sort.Order.asc("id"))
+        );
+
+        Page<DirectoryEntity> entities;
+        if (directoryId == null) {
+            entities = directoryRepository.findByParentIdNull(pageable);
+        } else {
+            entities = directoryRepository.findByParent_Id(directoryId, pageable);
+        }
+
+        var resp = new DirectoryListResponse();
+        resp.setTotal(entities.getTotalElements());;
+        for (var entity : entities) {
+            resp.addDirectoriesItem(DirectoryMapper.toDto(entity));
+        }
+
+        return resp;
     }
 
     @Transactional
