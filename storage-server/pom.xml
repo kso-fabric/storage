@@ -109,6 +109,7 @@
                                 <openApiNullable>true</openApiNullable>
                                 <documentationProvider>none</documentationProvider>
                                 <annotationLibrary>none</annotationLibrary>
+                                <skipDefaultInterface>true</skipDefaultInterface>
 
                                 <apiPackage>${server.package}</apiPackage>
                                 <modelPackage>${server.package}.model</modelPackage>
