@@ -333,7 +333,7 @@ public class DirectoryServiceTests extends TestBase {
         request.setName(name);
 
         if (parentId != null) {
-            request.setParentId(JsonNullable.of(parentId));
+            request.setParentId(parentId);
         }
 
         return directoryService.createDirectory(request);

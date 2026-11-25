@@ -14,7 +14,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <revision>0.1.0</revision>
+        <revision>0.1.1</revision>
         <java.version>25</java.version>
         <openapi-generator.version>7.26.0</openapi-generator.version>
         <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>

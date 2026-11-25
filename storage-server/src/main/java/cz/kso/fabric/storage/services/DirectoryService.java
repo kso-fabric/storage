@@ -38,7 +38,7 @@ public class DirectoryService {
 
     @Transactional
     public DirectoryMetadata createDirectory(CreateDirectoryRequest request) {
-        var parentDirId = request.getParentId().orElse(null);
+        var parentDirId = request.getParentId();
         log.info("Creating new directory in {}", parentDirId);
 
         // TODO authorization
