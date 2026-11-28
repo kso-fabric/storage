@@ -31,8 +31,7 @@ public abstract class TestBase {
         jdbcTemplate.execute("""
             TRUNCATE TABLE
                 metadata_tag,
-                file,
-                directory,
+                item,
                 metadata,
                 tag
             RESTART IDENTITY CASCADE

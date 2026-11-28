@@ -3,7 +3,7 @@ package cz.kso.fabric.storage.services;
 import cz.kso.fabric.storage.api.model.StorageInfo;
 import cz.kso.fabric.storage.api.model.StorageIntegrity;
 import cz.kso.fabric.storage.config.StorageProperties;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,14 +25,14 @@ import java.util.UUID;
 public class StorageService {
 
     private final StorageProperties storageProperties;
-    private final FileRepository fileRepository;
+    private final ItemRepository itemRepository;
 
     public StorageInfo getStorageInfo() throws IOException {
         log.info("Getting storage info");
         // TODO authorization
         var store = getFileStore();
         return new StorageInfo()
-                .managedBytes(fileRepository.getTotalFileSize())
+                .managedBytes(itemRepository.getTotalFileSize())
                 .usedBytes(store.getTotalSpace() - store.getUnallocatedSpace())
                 .usableBytes(store.getUsableSpace())
                 .unallocatedBytes(store.getUnallocatedSpace())
@@ -59,13 +59,13 @@ public class StorageService {
             processBatch(counters, batch);
         }
 
-        try (var files = fileRepository.streamAllIds()) {
+        try (var files = itemRepository.streamAllFileIds()) {
             files.forEach(id -> processDatabaseFile(counters, id, rootPath));
         }
 
         return new StorageIntegrity()
-                .databaseFiles(fileRepository.count())
-                .databaseBytes(fileRepository.getTotalFileSize())
+                .databaseFiles(itemRepository.countFiles())
+                .databaseBytes(itemRepository.getTotalFileSize())
                 .diskFiles(counters.diskFiles)
                 .diskBytes(counters.diskBytes)
                 .missingFiles(counters.missing)
@@ -125,7 +125,7 @@ public class StorageService {
 
     private void processBatch(IntegrityCounters counters,
                               Map<UUID, Long> diskFiles) {
-        var databaseFiles = fileRepository.findSizesByIds(diskFiles.keySet());
+        var databaseFiles = itemRepository.findFileSizesByIds(diskFiles.keySet());
 
         var foundIds = new HashSet<UUID>();
 

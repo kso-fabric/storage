@@ -1,60 +1,79 @@
 openapi: 3.1.0
 info:
   title: Storage API
-  version: 0.1.2
+  version: 0.2.0
   description: Fabric file storage service.
 servers:
   - url: /storage-api/v1
 security:
-  - bearerAuth: [ ]
+  - bearerAuth: []
 tags:
   - name: File
   - name: Directory
+  - name: Item
   - name: Storage
 paths:
   /files:
     get:
-      tags: [ File ]
+      tags:
+        - File
       operationId: listFiles
       summary: List files in a directory
       parameters:
-        - name: directoryId
-          in: query
-          description: Omit for root directory
-          schema: { type: string, format: uuid }
-        - name: limit
-          in: query
-          schema: { type: integer, default: 100, minimum: 1, maximum: 1000 }
-        - name: offset
-          in: query
-          schema: { type: integer, default: 0, minimum: 0 }
+        - $ref: '#/components/parameters/DirectoryFilter'
+        - $ref: '#/components/parameters/NameFilter'
+        - $ref: '#/components/parameters/TagsFilter'
+        - $ref: '#/components/parameters/MinSize'
+        - $ref: '#/components/parameters/MaxSize'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+        - $ref: '#/components/parameters/UpdatedFrom'
+        - $ref: '#/components/parameters/UpdatedTo'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
       responses:
-        "200":
+        '200':
           description: Directory contents
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/FileListResponse" }
-        "404": { $ref: "#/components/responses/NotFound" }
+              schema:
+                $ref: '#/components/schemas/ItemListDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      description: Filters are combined with AND. The directory itself is excluded. Invalid ranges return 400. A
+        page beyond the last page returns an empty items array. Pagination is not a snapshot of concurrent changes.
     post:
-      tags: [ File ]
+      tags:
+        - File
       operationId: uploadFile
       summary: Upload a file
       parameters:
         - name: X-File-Name
           in: header
           required: true
-          schema: { type: string }
+          schema:
+            type: string
         - name: X-Directory-Id
           in: header
-          schema: { type: string, format: uuid }
+          schema:
+            type: string
+            format: uuid
         - name: X-Content-SHA256
           in: header
           description: Expected SHA-256 checksum in hexadecimal
-          schema: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+          schema:
+            type: string
+            pattern: ^[a-fA-F0-9]{64}$
         - name: X-Content-Type
           in: header
           description: File Content-Type
-          schema: { type: string, example: "image/x-canon-cr2" }
+          schema:
+            type: string
+            example: image/x-canon-cr2
       requestBody:
         required: true
         content:
@@ -63,67 +82,95 @@ paths:
               type: string
               format: binary
       responses:
-        "201":
+        '201':
           description: File uploaded successfully
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/FileMetadata" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "413": { description: File exceeds allowed size }
-        "422": { description: Checksum mismatch }
-        "507": { description: Insufficient storage space }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: File exceeds allowed size
+        '422':
+          description: Checksum mismatch
+        '507':
+          description: Insufficient storage space
+        '404':
+          $ref: '#/components/responses/NotFound'
   /files/{id}:
     parameters:
-      - { $ref: "#/components/parameters/FileId" }
+      - $ref: '#/components/parameters/FileId'
     get:
-      tags: [ File ]
+      tags:
+        - File
       operationId: getFile
       summary: Get file metadata
       responses:
-        "200":
+        '200':
           description: File metadata
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/FileMetadata" }
-        "404": { $ref: "#/components/responses/NotFound" }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns 404 if the ID does not identify a file.
     patch:
-      tags: [ File ]
+      tags:
+        - File
       operationId: updateFile
       summary: Rename or move a file
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UpdateItemRequest" }
+            schema:
+              $ref: '#/components/schemas/UpdateFileRequest'
       responses:
-        "200":
+        '200':
           description: Updated file
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/FileMetadata" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      description: Returns 404 if the ID does not identify a file.
     delete:
-      tags: [ File ]
+      tags:
+        - File
       operationId: deleteFile
       summary: Delete a file
       responses:
-        "204": { description: File deleted }
-        "404": { $ref: "#/components/responses/NotFound" }
+        '204':
+          description: File deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns 404 if the ID does not identify a file.
   /files/{id}/content:
     parameters:
-      - { $ref: "#/components/parameters/FileId" }
+      - $ref: '#/components/parameters/FileId'
     get:
-      tags: [ File ]
+      tags:
+        - File
       operationId: downloadFile
       summary: Download file content
       responses:
-        "200":
-          description: |
-            File content.
+        '200':
+          description: 'File content.
+
             The Content-Type header contains the stored MIME type
+
             of the file, or application/octet-stream if unknown.
+
+            '
           headers:
             Content-Disposition:
               description: Original filename
@@ -143,20 +190,27 @@ paths:
               schema:
                 type: string
                 format: binary
-        "404": { $ref: "#/components/responses/NotFound" }
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns 404 if the ID does not identify a file.
     put:
-      tags: [ File ]
+      tags:
+        - File
       operationId: updateFileContent
       summary: Update file content
       parameters:
         - name: X-Content-SHA256
           in: header
           description: Expected SHA-256 checksum in hexadecimal
-          schema: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+          schema:
+            type: string
+            pattern: ^[a-fA-F0-9]{64}$
         - name: X-Content-Type
           in: header
           description: File Content-Type
-          schema: { type: string, example: "image/x-canon-cr2" }
+          schema:
+            type: string
+            example: image/x-canon-cr2
       requestBody:
         required: true
         content:
@@ -165,92 +219,124 @@ paths:
               type: string
               format: binary
       responses:
-        "204":
+        '204':
           description: File content replaced successfully
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "413":
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
           description: File exceeds allowed size
-        "422":
+        '422':
           description: Checksum mismatch
-        "507":
+        '507':
           description: Insufficient storage space
+      description: Returns 404 if the ID does not identify a file.
   /directories:
     get:
-      tags: [ Directory ]
+      tags:
+        - Directory
       operationId: listDirectory
       summary: List directories in a directory
       parameters:
-        - name: directoryId
-          in: query
-          description: Omit for root directory
-          schema: { type: string, format: uuid }
-        - name: limit
-          in: query
-          schema: { type: integer, default: 100, minimum: 1, maximum: 1000 }
-        - name: offset
-          in: query
-          schema: { type: integer, default: 0, minimum: 0 }
+        - $ref: '#/components/parameters/DirectoryFilter'
+        - $ref: '#/components/parameters/NameFilter'
+        - $ref: '#/components/parameters/TagsFilter'
+        - $ref: '#/components/parameters/MinSize'
+        - $ref: '#/components/parameters/MaxSize'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+        - $ref: '#/components/parameters/UpdatedFrom'
+        - $ref: '#/components/parameters/UpdatedTo'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
       responses:
-        "200":
+        '200':
           description: Directory contents
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DirectoryListResponse" }
-        "404": { $ref: "#/components/responses/NotFound" }
+              schema:
+                $ref: '#/components/schemas/ItemListDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      description: Filters are combined with AND. The directory itself is excluded. Invalid ranges return 400. A
+        page beyond the last page returns an empty items array. Pagination is not a snapshot of concurrent changes.
     post:
-      tags: [ Directory ]
+      tags:
+        - Directory
       operationId: createDirectory
       summary: Create a directory
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateDirectoryRequest" }
+            schema:
+              $ref: '#/components/schemas/CreateDirectoryRequest'
       responses:
-        "201":
+        '201':
           description: Directory created
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DirectoryMetadata" }
-        "409": { $ref: "#/components/responses/Conflict" }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /directories/{id}:
     parameters:
-      - { $ref: "#/components/parameters/DirectoryId" }
+      - $ref: '#/components/parameters/DirectoryId'
     get:
-      tags: [ Directory ]
+      tags:
+        - Directory
       operationId: getDirectory
       summary: Get directory metadata
       responses:
-        "200":
+        '200':
           description: Directory metadata
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DirectoryMetadata" }
-        "404": { $ref: "#/components/responses/NotFound" }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns 404 if the ID does not identify a directory.
     patch:
-      tags: [ Directory ]
+      tags:
+        - Directory
       operationId: updateDirectory
       summary: Rename or move a directory
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UpdateItemRequest" }
+            schema:
+              $ref: '#/components/schemas/UpdateDirectoryRequest'
       responses:
-        "200":
+        '200':
           description: Updated directory
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DirectoryMetadata" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      description: Returns 404 if the ID does not identify a directory.
     delete:
-      tags: [ Directory ]
+      tags:
+        - Directory
       operationId: deleteDirectory
       summary: Delete a directory
       parameters:
@@ -262,33 +348,95 @@ paths:
             type: boolean
             default: false
       responses:
-        "204": { description: Directory deleted }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Directory is not empty and recursive is on }
+        '204':
+          description: Directory deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Directory is not empty and recursive is false.
+      description: Returns 404 if the ID does not identify a directory.
+  /items:
+    get:
+      tags:
+        - Item
+      operationId: listItems
+      summary: List or search files and directories
+      responses:
+        '200':
+          description: Matching items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemListDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      parameters:
+        - $ref: '#/components/parameters/DirectoryFilter'
+        - $ref: '#/components/parameters/NameFilter'
+        - $ref: '#/components/parameters/TagsFilter'
+        - $ref: '#/components/parameters/MinSize'
+        - $ref: '#/components/parameters/MaxSize'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+        - $ref: '#/components/parameters/UpdatedFrom'
+        - $ref: '#/components/parameters/UpdatedTo'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/TypeFilter'
+      description: Filters are combined with AND. The directory itself is excluded. Invalid ranges return 400. A
+        page beyond the last page returns an empty items array. Pagination is not a snapshot of concurrent changes.
+  /items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    get:
+      tags:
+        - Item
+      operationId: getItem
+      summary: Get item metadata
+      responses:
+        '200':
+          description: Item metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /storage:
     get:
-      tags: [ Storage ]
+      tags:
+        - Storage
       operationId: getStorageInfo
       summary: Get storage capacity and usage
       responses:
-        "200":
+        '200':
           description: Storage information
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/StorageInfo" }
+              schema:
+                $ref: '#/components/schemas/StorageInfo'
   /storage/integrity:
     get:
       tags:
         - Storage
       operationId: getStorageIntegrity
       summary: Check storage integrity
-      description: |
-        Performs a full scan of the storage directory and compares
+      description: 'Performs a full scan of the storage directory and compares
+
         physical files with database records.
 
+
         This operation may be slow for large storage volumes.
+
         File checksums are not recalculated.
+
         No files or database records are modified.
+
+        '
       responses:
         '200':
           description: Storage integrity report
@@ -300,18 +448,143 @@ paths:
           description: Internal server error
 components:
   securitySchemes:
-    bearerAuth: { type: http, scheme: bearer }
+    bearerAuth:
+      type: http
+      scheme: bearer
   parameters:
     FileId:
       name: id
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        format: uuid
     DirectoryId:
       name: id
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        format: uuid
+    DirectoryFilter:
+      name: directoryId
+      in: query
+      description: Parent directory. Omit for virtual root.
+      schema:
+        type: string
+        format: uuid
+    NameFilter:
+      name: name
+      in: query
+      description: Case-insensitive literal substring of item name.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+    TagsFilter:
+      name: tags
+      in: query
+      description: Match all supplied tags exactly.
+      schema:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 100
+      style: form
+      explode: true
+    MinSize:
+      name: minSize
+      in: query
+      description: Inclusive minimum size in bytes.
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    MaxSize:
+      name: maxSize
+      in: query
+      description: Inclusive maximum size in bytes.
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    CreatedFrom:
+      name: createdFrom
+      in: query
+      description: Inclusive lower timestamp bound.
+      schema:
+        type: string
+        format: date-time
+    CreatedTo:
+      name: createdTo
+      in: query
+      description: Inclusive upper timestamp bound.
+      schema:
+        type: string
+        format: date-time
+    UpdatedFrom:
+      name: updatedFrom
+      in: query
+      description: Inclusive lower timestamp bound.
+      schema:
+        type: string
+        format: date-time
+    UpdatedTo:
+      name: updatedTo
+      in: query
+      description: Inclusive upper timestamp bound.
+      schema:
+        type: string
+        format: date-time
+    Sort:
+      name: sort
+      in: query
+      description: Sort field. UUID ascending is always the final tie-breaker.
+      schema:
+        allOf:
+          - $ref: '#/components/schemas/ItemSort'
+        default: NAME
+    Order:
+      name: order
+      in: query
+      description: Sort direction.
+      schema:
+        allOf:
+          - $ref: '#/components/schemas/SortOrder'
+        default: ASC
+    Limit:
+      name: limit
+      in: query
+      description: Items per page.
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 1000
+    Page:
+      name: page
+      in: query
+      description: Zero-based page number.
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+    TypeFilter:
+      name: type
+      in: query
+      description: Restrict results to one item type.
+      schema:
+        $ref: '#/components/schemas/ItemType'
+    ItemId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     Metadata:
       type: object
@@ -329,60 +602,29 @@ components:
         custom:
           type: object
           additionalProperties: true
-    FileMetadata:
-      type: object
-      required: [ id, name, size, checksum, createdAt ]
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        directoryId: { type: string, format: uuid }
-        size: { type: integer, format: int64 }
-        contentType: { type: string }
-        checksum: { type: string, description: SHA-256 checksum in hexadecimal }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        additionalData:
-          $ref: "#/components/schemas/Metadata"
-          description: Arbitrary JSON metadata associated with the file.
-    FileListResponse:
-      type: object
-      required: [ files, total ]
-      properties:
-        files:
-          type: array
-          items: { $ref: "#/components/schemas/FileMetadata" }
-        total: { type: integer, format: int64 }
-    UpdateItemRequest:
-      type: object
-      minProperties: 1
-      properties:
-        name:
-          type: [ string, "null" ]
-          minLength: 1
-        directoryId:
-          type: [ string, "null" ]
-          format: uuid
-        additionalData:
-          oneOf:
-            - $ref: "#/components/schemas/UpdateMetadataRequest"
-            - type: "null"
     UpdateMetadataRequest:
       type: object
       minProperties: 1
       properties:
         description:
-          type: [ string, "null" ]
+          type:
+            - string
+            - 'null'
           maxLength: 2000
         tags:
           type: array
           items:
             $ref: '#/components/schemas/UpdateTagItem'
         custom:
-          type: [ object, "null" ]
+          type:
+            - object
+            - 'null'
           additionalProperties: true
     UpdateTagItem:
       type: object
-      required: [ value, action ]
+      required:
+        - value
+        - action
       properties:
         value:
           type: string
@@ -390,58 +632,52 @@ components:
           maxLength: 100
         action:
           type: string
-          enum: [ ADD, DELETE ]
+          enum:
+            - ADD
+            - DELETE
     CreateDirectoryRequest:
       type: object
-      required: [ name ]
+      required:
+        - name
       properties:
-        name: { type: string, minLength: 1 }
-        parentId: { type: string, format: uuid }
-    DirectoryMetadata:
-      type: object
-      required: [ id, name, createdAt ]
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        parentId: { type: string, format: uuid }
-        createdAt: { type: string, format: date-time }
-        additionalData:
-          $ref: "#/components/schemas/Metadata"
-          description: Arbitrary JSON metadata associated with the directory.
-    DirectoryListResponse:
-      type: object
-      required: [ directories, total ]
-      properties:
-        directories:
-          type: array
-          items: { $ref: "#/components/schemas/DirectoryMetadata" }
-        total: { type: integer, format: int64 }
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        parentId:
+          type: string
+          format: uuid
     StorageInfo:
       type: object
-      required: [ managedBytes, usedBytes, usableBytes, unallocatedBytes, totalBytes ]
+      required:
+        - managedBytes
+        - usedBytes
+        - usableBytes
+        - unallocatedBytes
+        - totalBytes
       properties:
         managedBytes:
-          description: 'Total logical size of files managed by Storage'
+          description: Total logical size of files managed by Storage
           type: integer
           format: int64
         usedBytes:
-          description: 'Total allocated space on the filesystem'
+          description: Total allocated space on the filesystem
           type: integer
           format: int64
         usableBytes:
-          description: 'Space available to the Storage process'
+          description: Space available to the Storage process
           type: integer
           format: int64
         unallocatedBytes:
-          description: 'Total unallocated space on the filesystem'
+          description: Total unallocated space on the filesystem
           type: integer
           format: int64
         blockSize:
-          description: 'Filesystem block size in bytes'
+          description: Filesystem block size in bytes
           type: integer
           format: int64
         totalBytes:
-          description: 'Total filesystem capacity in bytes'
+          description: Total filesystem capacity in bytes
           type: integer
           format: int64
     StorageIntegrity:
@@ -485,24 +721,168 @@ components:
           description: Sum of actual file sizes found on disk
     ErrorResponse:
       type: object
-      required: [ title, status, detail ]
+      required:
+        - title
+        - status
+        - detail
       properties:
-        title: { type: string }
-        status: { type: integer }
-        detail: { type: string }
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+    ItemType:
+      type: string
+      enum:
+        - FILE
+        - DIRECTORY
+    ItemSort:
+      type: string
+      enum:
+        - NAME
+        - SIZE
+        - CREATED_AT
+        - UPDATED_AT
+        - TYPE
+    SortOrder:
+      type: string
+      enum:
+        - ASC
+        - DESC
+    ItemDTO:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - size
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+          description: File size or recursive sum of descendant file sizes in bytes.
+        contentType:
+          type: string
+          description: Stored MIME type; omitted for directories.
+        checksum:
+          type: string
+          description: SHA-256 hexadecimal checksum; required for files, omitted for directories.
+          pattern: ^[a-fA-F0-9]{64}$
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        additionalData:
+          $ref: '#/components/schemas/Metadata'
+          description: Metadata associated with the item.
+        parentId:
+          type: string
+          format: uuid
+          description: Parent directory UUID; omitted for virtual root.
+        type:
+          $ref: '#/components/schemas/ItemType'
+    ItemListDTO:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - limit
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDTO'
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total matching items before pagination.
+        page:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        totalPages:
+          type: integer
+          format: int64
+          minimum: 0
+    UpdateFileRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type:
+            - string
+            - 'null'
+          minLength: 1
+          maxLength: 255
+          description: Omit to keep current name.
+        additionalData:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateMetadataRequest'
+            - type: 'null'
+        parentId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Omit to keep current parent; null moves to root.
+      additionalProperties: false
+    UpdateDirectoryRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type:
+            - string
+            - 'null'
+          minLength: 1
+          maxLength: 255
+          description: Omit to keep current name.
+        additionalData:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateMetadataRequest'
+            - type: 'null'
+        parentId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Omit to keep current parent; null moves to root.
+      additionalProperties: false
   responses:
     BadRequest:
       description: Invalid request
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     NotFound:
       description: Resource not found
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Conflict:
       description: Resource conflict
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

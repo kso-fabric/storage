@@ -1,19 +1,18 @@
 package cz.kso.fabric.storage.services;
 
-import cz.kso.fabric.storage.api.model.FileListResponse;
-import cz.kso.fabric.storage.api.model.FileMetadata;
-import cz.kso.fabric.storage.api.model.UpdateItemRequest;
+import cz.kso.fabric.storage.api.model.ItemDTO;
+import cz.kso.fabric.storage.api.model.ItemListDTO;
+import cz.kso.fabric.storage.api.model.UpdateFileRequest;
 import cz.kso.fabric.storage.config.StorageProperties;
-import cz.kso.fabric.storage.entities.DirectoryEntity;
-import cz.kso.fabric.storage.entities.FileEntity;
+import cz.kso.fabric.storage.entities.ItemEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.entities.enums.ItemType;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.mappers.FileMapper;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.mappers.ItemMapper;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.utils.MapperUtils;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -46,81 +45,79 @@ import java.util.UUID;
 public class FileService {
 
     private final StorageProperties storageProperties;
-    private final FileRepository fileRepository;
-    private final DirectoryRepository directoryRepository;
+    private final ItemRepository itemRepository;
     private final StorageService storageService;
     private final MapperUtils mapperUtils;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
     @Transactional(readOnly = true)
-    public FileListResponse listFiles(UUID directoryId, Integer limit, Integer offset) {
-        log.info("Listing files with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
+    public ItemListDTO listFiles(UUID directoryId, Integer limit, Integer page) {
+        log.info("Listing files with limit: {}, page: {}, directoryId: {}", limit, page, directoryId);
         // TODO authorization
         var pageable = PageRequest.of(
-                offset / limit,
+                page,
                 limit,
                 Sort.by(Sort.Order.asc("name"),
                         Sort.Order.asc("id"))
         );
 
-        Page<FileEntity> entities;
-        if (directoryId == null) {
-            entities = fileRepository.findByDirectoryIsNull(pageable);
-        } else {
-            entities = fileRepository.findByDirectory_Id(directoryId, pageable);
-        }
+        Page<ItemEntity> entities = itemRepository.findFilesByParentId(directoryId, pageable);
 
-        var resp = new FileListResponse();
+        var resp = new ItemListDTO();
         resp.setTotal(entities.getTotalElements());
         for (var entity : entities) {
-            resp.addFilesItem(FileMapper.toDto(entity));
+            resp.addItemsItem(ItemMapper.toDto(entity));
         }
 
         return resp;
     }
 
     @Transactional
-    public FileMetadata getFile(UUID id) {
+    public ItemDTO getFile(UUID id) {
         log.info("Getting file: {}", id);
         // TODO authorization
-        var fileEntity = fileRepository.findById(id)
+        var fileEntity = itemRepository.findFileById(id)
                 .orElseThrow(() -> new NotFoundException("File", id));
 
-        return FileMapper.toDto(fileEntity);
+        return ItemMapper.toDto(fileEntity);
     }
 
     @Transactional
-    public FileMetadata updateFile(UUID id, UpdateItemRequest request) {
+    public ItemDTO updateFile(UUID id, UpdateFileRequest request) {
         log.info("Updating file: {}", id);
         // TODO authorization
-        var fileEntity = fileRepository.findById(id)
+        var fileEntity = itemRepository.findFileById(id)
                 .orElseThrow(() -> new NotFoundException("File", id));
 
-        MapperUtils.applyIfPresent(request.getName(), fileEntity::setName);
-        mapperUtils.updateDirectoryIfPresent(request.getDirectoryId(), fileEntity::setDirectory);
-        mapperUtils.updateMetadataIfPresent(request, fileEntity);
-
-        return FileMapper.toDto(fileEntity);
-    }
-
-    public FileMetadata uploadFile(String fileName,
-                                   UUID directoryId,
-                                   String sha256,
-                                   String contentType,
-                                   long contentLength,
-                                   InputStream input) throws IOException {
-        log.info("Uploading new file {} in directory {}", fileName, directoryId);
-        // TODO authorization
-        DirectoryEntity dirEntity = null;
-        if (directoryId != null) {
-            dirEntity = directoryRepository.findById(directoryId)
-                    .orElseThrow(() -> new NotFoundException("Directory", directoryId));
+        if (request.getParentId().isPresent()) {
+            var parentId = request.getParentId().get();
+            if (!itemRepository.existsDirectoryById(parentId)
+            && parentId != null) {
+                throw new NotFoundException("Directory", parentId);
+            }
         }
 
-        if (directoryId == null
-                ? fileRepository.existsByDirectoryIsNullAndName(fileName)
-                : fileRepository.existsByDirectory_IdAndName(directoryId, fileName)) {
+        MapperUtils.applyIfPresent(request.getName(), fileEntity::setName);
+        MapperUtils.applyIfPresent(request.getParentId(), fileEntity::setParentId);
+        mapperUtils.updateIfPresent(request.getAdditionalData(), fileEntity);
+
+        return ItemMapper.toDto(fileEntity);
+    }
+
+    public ItemDTO uploadFile(String fileName,
+                              UUID directoryId,
+                              String sha256,
+                              String contentType,
+                              long contentLength,
+                              InputStream input) throws IOException {
+        log.info("Uploading new file {} in directory {}", fileName, directoryId);
+        // TODO authorization
+        if (directoryId != null && !itemRepository.existsDirectoryById(directoryId)) {
+            throw new NotFoundException("Directory", directoryId);
+        }
+
+        if (itemRepository.existsByParentIdAndName(directoryId, fileName)) {
             throw new ConflictException("File %s already exists in directory %s",
                                         fileName,
                                         directoryId);
@@ -131,10 +128,11 @@ public class FileService {
             throw new InsufficientStorageException();
         }
 
-        var fileEntity = new FileEntity();
+        var fileEntity = new ItemEntity();
         fileEntity.setId(UUID.randomUUID());
         fileEntity.setName(fileName);
-        fileEntity.setDirectory(dirEntity);
+        fileEntity.setType(ItemType.FILE);
+        fileEntity.setParentId(directoryId);
         fileEntity.setContentType(contentType);
         fileEntity.setMetadata(new MetadataEntity());
 
@@ -147,7 +145,7 @@ public class FileService {
         });
 
         log.info("Uploaded file {}", fileEntity.getId());
-        return FileMapper.toDto(fileEntity);
+        return ItemMapper.toDto(fileEntity);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -162,7 +160,7 @@ public class FileService {
             throw new InsufficientStorageException();
         }
 
-        var fileEntity = fileRepository.findById(id)
+        var fileEntity = itemRepository.findFileById(id)
                 .orElseThrow(() -> new NotFoundException("File", id));
 
         var origPath = getFilePath(fileEntity);
@@ -179,7 +177,7 @@ public class FileService {
 
             // Write and validate the new content without changing
             // the managed entity.
-            var newContent = new FileEntity();
+            var newContent = new ItemEntity();
             writeFile(newContent, tempPath, sha256, input);
 
             // Preserve the original content for rollback.
@@ -196,14 +194,14 @@ public class FileService {
 
             // The transaction is committed before executeWithoutResult returns.
             transactionTemplate.executeWithoutResult(_ -> {
-                var entity = fileRepository.findById(id)
+                var entity = itemRepository.findFileById(id)
                         .orElseThrow(() -> new NotFoundException("File", id));
 
                 entity.setChecksum(newContent.getChecksum());
                 entity.setSize(newContent.getSize());
                 entity.setContentType(contentType);
 
-                fileRepository.saveAndFlush(entity);
+                itemRepository.saveAndFlush(entity);
             });
 
             committed = true;
@@ -260,10 +258,10 @@ public class FileService {
         log.info("Deleting file: {}", id);
 
         transactionTemplate.executeWithoutResult(status -> {
-            var fileEntity = fileRepository.findById(id)
+            var fileEntity = itemRepository.findFileById(id)
                     .orElseThrow(() -> new NotFoundException("File", id));
 
-            fileRepository.delete(fileEntity);
+            itemRepository.delete(fileEntity);
         });
 
         var path = Path.of(storageProperties.getDiscRoot(), id.toString());
@@ -276,7 +274,7 @@ public class FileService {
 
     //region Upload file
 
-    private Path getFilePath(FileEntity fileEntity) throws IOException {
+    private Path getFilePath(ItemEntity fileEntity) throws IOException {
         var path = Path.of(storageProperties.getDiscRoot(),
                            fileEntity.getId().toString());
         Files.createDirectories(path.getParent());
@@ -303,7 +301,7 @@ public class FileService {
         return calculatedChecksum;
     }
 
-    private void writeFile(FileEntity fileEntity,
+    private void writeFile(ItemEntity fileEntity,
                            Path path,
                            String sha256,
                            InputStream input) throws IOException {
@@ -330,13 +328,14 @@ public class FileService {
 
     //region Prepare download
 
-    private MediaType getFileContentType(FileMetadata metadata) {
+    private MediaType getFileContentType(ItemDTO metadata) {
         return metadata.getContentType() != null
                 ? MediaType.parseMediaType(metadata.getContentType())
                 : MediaType.APPLICATION_OCTET_STREAM;
     }
 
-    private String getContentDigest(FileMetadata metadata) {
+    private String getContentDigest(ItemDTO metadata) {
+        assert metadata.getChecksum() != null;
         byte[] digest = HexFormat.of().parseHex(metadata.getChecksum());
         return "sha-256=:" + Base64.getEncoder().encodeToString(digest) + ":";
     }

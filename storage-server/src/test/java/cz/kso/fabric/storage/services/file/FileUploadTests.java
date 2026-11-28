@@ -1,14 +1,14 @@
 package cz.kso.fabric.storage.services.file;
 
 import cz.kso.fabric.storage.TestBase;
-import cz.kso.fabric.storage.entities.DirectoryEntity;
+import cz.kso.fabric.storage.entities.ItemEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.entities.enums.ItemType;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.services.FileService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterAll;
@@ -45,10 +45,7 @@ public class FileUploadTests extends TestBase {
     private FileService fileService;
 
     @Autowired
-    private FileRepository fileRepository;
-
-    @Autowired
-    private DirectoryRepository directoryRepository;
+    private ItemRepository itemRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -74,9 +71,9 @@ public class FileUploadTests extends TestBase {
         Assertions.assertEquals(content.length, response.getSize());
         Assertions.assertEquals(sha256(content), response.getChecksum());
 
-        var entity = fileRepository.findById(response.getId()).orElseThrow();
+        var entity = itemRepository.findFileById(response.getId()).orElseThrow();
 
-        Assertions.assertNull(entity.getDirectory());
+        Assertions.assertNull(entity.getParentId());
         Assertions.assertNotNull(entity.getMetadata());
 
         var path = filePath(response.getId());
@@ -99,12 +96,12 @@ public class FileUploadTests extends TestBase {
                 new ByteArrayInputStream(content)
         );
 
-        var entity = fileRepository.findById(response.getId()).orElseThrow();
+        var entity = itemRepository.findFileById(response.getId()).orElseThrow();
 
-        Assertions.assertNotNull(entity.getDirectory());
+        Assertions.assertNotNull(entity.getParentId());
         Assertions.assertEquals(
                 directory.getId(),
-                entity.getDirectory().getId()
+                entity.getParentId()
         );
 
         Assertions.assertArrayEquals(
@@ -136,7 +133,7 @@ public class FileUploadTests extends TestBase {
         byte[] content = "Invalid checksum".getBytes(StandardCharsets.UTF_8);
         String wrongChecksum = "0".repeat(64);
 
-        long countBefore = fileRepository.count();
+        long countBefore = itemRepository.count();
         long filesBefore = countStoredFiles();
 
         Assertions.assertThrows(ChecksumMismatchException.class, () ->
@@ -150,7 +147,7 @@ public class FileUploadTests extends TestBase {
                 )
         );
 
-        Assertions.assertEquals(countBefore, fileRepository.count());
+        Assertions.assertEquals(countBefore, itemRepository.count());
         Assertions.assertEquals(filesBefore, countStoredFiles());
     }
 
@@ -158,7 +155,7 @@ public class FileUploadTests extends TestBase {
     void uploadFile_shouldRejectNonexistentDirectory_ShouldReject() {
         byte[] content = "Test".getBytes(StandardCharsets.UTF_8);
 
-        long countBefore = fileRepository.count();
+        long countBefore = itemRepository.count();
         long filesBefore = countStoredFiles();
 
         Assertions.assertThrows(NotFoundException.class, () ->
@@ -172,7 +169,7 @@ public class FileUploadTests extends TestBase {
                 )
         );
 
-        Assertions.assertEquals(countBefore, fileRepository.count());
+        Assertions.assertEquals(countBefore, itemRepository.count());
         Assertions.assertEquals(filesBefore, countStoredFiles());
     }
 
@@ -189,7 +186,7 @@ public class FileUploadTests extends TestBase {
                 new ByteArrayInputStream(content)
         );
 
-        long countBefore = fileRepository.count();
+        long countBefore = itemRepository.count();
         long filesBefore = countStoredFiles();
 
         Assertions.assertThrows(ConflictException.class, () ->
@@ -203,7 +200,7 @@ public class FileUploadTests extends TestBase {
                 )
         );
 
-        Assertions.assertEquals(countBefore, fileRepository.count());
+        Assertions.assertEquals(countBefore, itemRepository.count());
         Assertions.assertEquals(filesBefore, countStoredFiles());
 
         Assertions.assertArrayEquals(
@@ -225,10 +222,12 @@ public class FileUploadTests extends TestBase {
                                        new ByteArrayInputStream(content)));
     }
 
-    private DirectoryEntity createDirectory(String name) {
+    private ItemEntity createDirectory(String name) {
         return transactionTemplate.execute(status -> {
-            var directory = new DirectoryEntity();
+            var directory = new ItemEntity();
+            directory.setId(UUID.randomUUID());
             directory.setName(name);
+            directory.setType(ItemType.DIRECTORY);
             directory.setMetadata(new MetadataEntity());
 
             entityManager.persist(directory);

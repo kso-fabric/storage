@@ -1,10 +1,10 @@
 package cz.kso.fabric.storage.services.file;
 
 import cz.kso.fabric.storage.TestBase;
-import cz.kso.fabric.storage.api.model.FileMetadata;
+import cz.kso.fabric.storage.api.model.ItemDTO;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.services.FileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -29,7 +29,7 @@ public class FileDownloadTests extends TestBase {
     private FileService fileService;
 
     @Autowired
-    private FileRepository fileRepository;
+    private ItemRepository itemRepository;
 
     @Autowired
     private StorageProperties storageProperties;
@@ -130,7 +130,7 @@ public class FileDownloadTests extends TestBase {
         );
 
         Assertions.assertTrue(
-                fileRepository.existsById(uploaded.getId())
+                itemRepository.existsFileById(uploaded.getId())
         );
     }
 
@@ -154,7 +154,7 @@ public class FileDownloadTests extends TestBase {
         );
     }
 
-    private FileMetadata upload(
+    private ItemDTO upload(
             String name,
             String contentType,
             byte[] content

@@ -2,20 +2,16 @@ package cz.kso.fabric.storage.services;
 
 import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
-import cz.kso.fabric.storage.api.model.DirectoryMetadata;
+import cz.kso.fabric.storage.api.model.ItemDTO;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
-import cz.kso.fabric.storage.repositories.FileRepository;
-import cz.kso.fabric.storage.services.DirectoryService;
-import cz.kso.fabric.storage.services.FileService;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
@@ -37,10 +33,7 @@ public class DirectoryServiceTests extends TestBase {
     private FileService fileService;
 
     @Autowired
-    private DirectoryRepository directoryRepository;
-
-    @Autowired
-    private FileRepository fileRepository;
+    private ItemRepository itemRepository;
 
     @Autowired
     private StorageProperties storageProperties;
@@ -56,9 +49,7 @@ public class DirectoryServiceTests extends TestBase {
     @AfterEach
     void tearDown() throws IOException {
         try (var paths = Files.walk(storageRoot)) {
-            for (var path : paths.sorted(
-                    Comparator.reverseOrder()
-            ).toList()) {
+            for (var path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
         }
@@ -72,7 +63,7 @@ public class DirectoryServiceTests extends TestBase {
 
         Assertions.assertNotNull(created.getId());
         Assertions.assertEquals("Root directory", created.getName());
-        Assertions.assertTrue(directoryRepository.existsById(created.getId()));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(created.getId()));
     }
 
     @Test
@@ -80,21 +71,17 @@ public class DirectoryServiceTests extends TestBase {
         var parent = createDirectory("Parent", null);
         var child = createDirectory("Child", parent.getId());
 
-        var entity = directoryRepository.findById(child.getId())
-                .orElseThrow();
+        var entity = itemRepository.findDirectoryById(child.getId()).orElseThrow();
 
         Assertions.assertEquals("Child", entity.getName());
-        Assertions.assertEquals(parent.getId(), entity.getParent().getId());
+        Assertions.assertEquals(parent.getId(), entity.getParentId());
     }
 
     @Test
     void createDirectory_ForUnknownParent_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
-        Assertions.assertThrows(
-                NotFoundException.class,
-                () -> createDirectory("Child", unknownId)
-        );
+        Assertions.assertThrows(NotFoundException.class, () -> createDirectory("Child", unknownId));
     }
 
     // endregion
@@ -115,10 +102,7 @@ public class DirectoryServiceTests extends TestBase {
     void getDirectory_ForUnknownId_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
-        Assertions.assertThrows(
-                NotFoundException.class,
-                () -> directoryService.getDirectory(unknownId)
-        );
+        Assertions.assertThrows(NotFoundException.class, () -> directoryService.getDirectory(unknownId));
     }
 
     // endregion
@@ -131,27 +115,19 @@ public class DirectoryServiceTests extends TestBase {
 
         directoryService.deleteDirectory(directory.getId(), true);
 
-        Assertions.assertFalse(
-                directoryRepository.existsById(directory.getId())
-        );
+        Assertions.assertFalse(itemRepository.existsDirectoryById(directory.getId()));
     }
 
     @Test
     void deleteDirectory_ForUnknownIdRecursive_ShouldFail() {
         UUID unknownId = UUID.randomUUID();
 
-        Assertions.assertThrows(
-                NotFoundException.class,
-                () -> directoryService.deleteDirectory(unknownId, true)
-        );
+        Assertions.assertThrows(NotFoundException.class, () -> directoryService.deleteDirectory(unknownId, true));
     }
 
     @Test
     void deleteDirectory_RootDeletionRecursive_ShouldReject() {
-        Assertions.assertThrows(
-                BadRequestException.class,
-                () -> directoryService.deleteDirectory(null, true)
-        );
+        Assertions.assertThrows(BadRequestException.class, () -> directoryService.deleteDirectory(null, true));
     }
 
     @Test
@@ -167,9 +143,7 @@ public class DirectoryServiceTests extends TestBase {
         assertFileDeleted(firstFile);
         assertFileDeleted(secondFile);
 
-        Assertions.assertFalse(
-                directoryRepository.existsById(directory.getId())
-        );
+        Assertions.assertFalse(itemRepository.existsDirectoryById(directory.getId()));
     }
 
     @Test
@@ -181,19 +155,12 @@ public class DirectoryServiceTests extends TestBase {
 
         UUID rootFile = uploadFile(root.getId(), "root.txt");
         UUID childFile = uploadFile(child.getId(), "child.txt");
-        UUID grandchildFile = uploadFile(
-                grandchild.getId(),
-                "grandchild.txt"
-        );
+        UUID grandchildFile = uploadFile(grandchild.getId(), "grandchild.txt");
 
         directoryService.deleteDirectory(root.getId(), true);
 
-        for (UUID id : List.of(
-                root.getId(),
-                child.getId(),
-                grandchild.getId()
-        )) {
-            Assertions.assertFalse(directoryRepository.existsById(id));
+        for (UUID id : List.of(root.getId(), child.getId(), grandchild.getId())) {
+            Assertions.assertFalse(itemRepository.existsDirectoryById(id));
         }
 
         assertFileDeleted(rootFile);
@@ -209,17 +176,12 @@ public class DirectoryServiceTests extends TestBase {
         List<UUID> fileIds = new ArrayList<>();
 
         for (int i = 0; i < 105; i++) {
-            fileIds.add(uploadFile(
-                    directory.getId(),
-                    "file-" + i + ".txt"
-            ));
+            fileIds.add(uploadFile(directory.getId(), "file-" + i + ".txt"));
         }
 
         directoryService.deleteDirectory(directory.getId(), true);
 
-        Assertions.assertFalse(
-                directoryRepository.existsById(directory.getId())
-        );
+        Assertions.assertFalse(itemRepository.existsDirectoryById(directory.getId()));
 
         for (UUID fileId : fileIds) {
             assertFileDeleted(fileId);
@@ -233,23 +195,16 @@ public class DirectoryServiceTests extends TestBase {
         List<UUID> childIds = new ArrayList<>();
 
         for (int i = 0; i < 105; i++) {
-            var child = createDirectory(
-                    "Child-" + i,
-                    parent.getId()
-            );
+            var child = createDirectory("Child-" + i, parent.getId());
             childIds.add(child.getId());
         }
 
         directoryService.deleteDirectory(parent.getId(), true);
 
-        Assertions.assertFalse(
-                directoryRepository.existsById(parent.getId())
-        );
+        Assertions.assertFalse(itemRepository.existsDirectoryById(parent.getId()));
 
         for (UUID childId : childIds) {
-            Assertions.assertFalse(
-                    directoryRepository.existsById(childId)
-            );
+            Assertions.assertFalse(itemRepository.existsDirectoryById(childId));
         }
     }
 
@@ -265,16 +220,14 @@ public class DirectoryServiceTests extends TestBase {
 
         directoryService.deleteDirectory(first.getId(), true);
 
-        Assertions.assertFalse(directoryRepository.existsById(first.getId()));
-        Assertions.assertTrue(directoryRepository.existsById(second.getId()));
-        Assertions.assertTrue(directoryRepository.existsById(parent.getId()));
+        Assertions.assertFalse(itemRepository.existsDirectoryById(first.getId()));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(second.getId()));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(parent.getId()));
 
         assertFileDeleted(firstFile);
 
-        Assertions.assertTrue(fileRepository.existsById(secondFile));
-        Assertions.assertTrue(
-                Files.exists(storageRoot.resolve(secondFile.toString()))
-        );
+        Assertions.assertTrue(itemRepository.existsDirectoryById(secondFile));
+        Assertions.assertTrue(Files.exists(storageRoot.resolve(secondFile.toString())));
     }
 
     // endregion
@@ -287,9 +240,7 @@ public class DirectoryServiceTests extends TestBase {
 
         directoryService.deleteDirectory(directory.getId(), false);
 
-        Assertions.assertFalse(
-                directoryRepository.existsById(directory.getId())
-        );
+        Assertions.assertFalse(itemRepository.existsDirectoryById(directory.getId()));
     }
 
     @Test
@@ -300,13 +251,10 @@ public class DirectoryServiceTests extends TestBase {
 
         Assertions.assertTrue(Files.exists(Path.of(storageProperties.getDiscRoot(), fileId.toString())));
 
-        Assertions.assertThrows(
-                ConflictException.class,
-                () -> directoryService.deleteDirectory(directory.getId(), false)
-        );
+        Assertions.assertThrows(ConflictException.class, () -> directoryService.deleteDirectory(directory.getId(), false));
 
-        Assertions.assertTrue(directoryRepository.existsById(directory.getId()));
-        Assertions.assertTrue(fileRepository.existsByDirectory_IdAndName(directory.getId(), fileName));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(directory.getId()));
+        Assertions.assertTrue(itemRepository.existsByParentIdAndName(directory.getId(), fileName));
         Assertions.assertTrue(Files.exists(Path.of(storageProperties.getDiscRoot(), fileId.toString())));
     }
 
@@ -315,20 +263,17 @@ public class DirectoryServiceTests extends TestBase {
         var directory = createDirectory("notEmpty", null);
         var dirIn = createDirectory("emptyIn", directory.getId());
 
-        Assertions.assertThrows(
-                ConflictException.class,
-                () -> directoryService.deleteDirectory(directory.getId(), false)
-        );
+        Assertions.assertThrows(ConflictException.class, () -> directoryService.deleteDirectory(directory.getId(), false));
 
-        Assertions.assertTrue(directoryRepository.existsById(directory.getId()));
-        Assertions.assertTrue(directoryRepository.existsById(dirIn.getId()));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(directory.getId()));
+        Assertions.assertTrue(itemRepository.existsDirectoryById(dirIn.getId()));
     }
 
     //endregion
 
     // region Helpers
 
-    private DirectoryMetadata createDirectory(String name, UUID parentId) {
+    private ItemDTO createDirectory(String name, UUID parentId) {
         var request = new CreateDirectoryRequest();
         request.setName(name);
 
@@ -342,28 +287,15 @@ public class DirectoryServiceTests extends TestBase {
     private UUID uploadFile(UUID directoryId, String name) throws IOException {
         byte[] content = ("Content of " + name).getBytes(StandardCharsets.UTF_8);
 
-        var uploaded = fileService.uploadFile(
-                name,
-                directoryId,
-                null,
-                "text/plain",
-                content.length,
-                new ByteArrayInputStream(content)
-        );
+        var uploaded = fileService.uploadFile(name, directoryId, null, "text/plain", content.length, new ByteArrayInputStream(content));
 
         return uploaded.getId();
     }
 
     private void assertFileDeleted(UUID fileId) {
-        Assertions.assertFalse(
-                fileRepository.existsById(fileId),
-                "File still exists in database: " + fileId
-        );
+        Assertions.assertFalse(itemRepository.existsFileById(fileId), "File still exists in database: " + fileId);
 
-        Assertions.assertFalse(
-                Files.exists(storageRoot.resolve(fileId.toString())),
-                "File still exists on disk: " + fileId
-        );
+        Assertions.assertFalse(Files.exists(storageRoot.resolve(fileId.toString())), "File still exists on disk: " + fileId);
     }
 
     // endregion

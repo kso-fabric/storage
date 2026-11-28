@@ -4,7 +4,7 @@ import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.services.FileService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +27,7 @@ public class FileServiceContentUpdateTests extends TestBase {
     private FileService fileService;
 
     @Autowired
-    private FileRepository fileRepository;
+    private ItemRepository itemRepository;
 
     @Autowired
     private StorageProperties storageProperties;
@@ -62,7 +62,7 @@ public class FileServiceContentUpdateTests extends TestBase {
         Assertions.assertEquals(checksum(newContent), metadata.getChecksum());
         Assertions.assertEquals("text/markdown", metadata.getContentType());
 
-        Assertions.assertEquals(1, fileRepository.count());
+        Assertions.assertEquals(1, itemRepository.count());
         assertNoTemporaryFiles(id);
     }
 
@@ -113,7 +113,7 @@ public class FileServiceContentUpdateTests extends TestBase {
                 )
         );
 
-        Assertions.assertEquals(0, fileRepository.count());
+        Assertions.assertEquals(0, itemRepository.count());
         Assertions.assertEquals(false, Files.exists(filePath(id)));
     }
 
@@ -157,7 +157,7 @@ public class FileServiceContentUpdateTests extends TestBase {
 
         Assertions.assertEquals(id, metadata.getId());
         Assertions.assertEquals("original-name.txt", metadata.getName());
-        Assertions.assertEquals(1, fileRepository.count());
+        Assertions.assertEquals(1, itemRepository.count());
     }
 
     // Helpers

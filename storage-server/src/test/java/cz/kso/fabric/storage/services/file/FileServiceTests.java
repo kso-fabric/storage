@@ -1,16 +1,12 @@
 package cz.kso.fabric.storage.services.file;
 
 import cz.kso.fabric.storage.TestBase;
-import cz.kso.fabric.storage.api.model.UpdateItemRequest;
-import cz.kso.fabric.storage.api.model.UpdateMetadataRequest;
-import cz.kso.fabric.storage.api.model.UpdateTagItem;
-import cz.kso.fabric.storage.entities.DirectoryEntity;
-import cz.kso.fabric.storage.entities.FileEntity;
-import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.api.model.*;
+import cz.kso.fabric.storage.entities.*;
+import cz.kso.fabric.storage.entities.enums.ItemType;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.repositories.TagRepository;
 import cz.kso.fabric.storage.services.FileService;
 import jakarta.persistence.EntityManager;
@@ -30,9 +26,7 @@ class FileServiceTests extends TestBase {
     @Autowired
     private FileService fileService;
     @Autowired
-    private FileRepository fileRepository;
-    @Autowired
-    private DirectoryRepository directoryRepository;
+    private ItemRepository itemRepository;
     @Autowired
     private TagRepository tagRepository;
     @Autowired
@@ -51,8 +45,8 @@ class FileServiceTests extends TestBase {
         var response = fileService.listFiles(null, 10, 0);
 
         Assertions.assertEquals(1, response.getTotal());
-        Assertions.assertEquals(1, response.getFiles().size());
-        Assertions.assertEquals("root.txt", response.getFiles().getFirst().getName());
+        Assertions.assertEquals(1, response.getItems().size());
+        Assertions.assertEquals("root.txt", response.getItems().getFirst().getName());
     }
 
     @Test
@@ -68,9 +62,9 @@ class FileServiceTests extends TestBase {
         var response = fileService.listFiles(first.getId(), 10, 0);
 
         Assertions.assertEquals(2, response.getTotal());
-        Assertions.assertEquals(2, response.getFiles().size());
-        Assertions.assertTrue(response.getFiles().stream()
-                                      .allMatch(file -> first.getId().equals(file.getDirectoryId())));
+        Assertions.assertEquals(2, response.getItems().size());
+        Assertions.assertTrue(response.getItems().stream()
+                                      .allMatch(file -> first.getId().equals(file.getParentId())));
     }
 
     @Test
@@ -78,8 +72,8 @@ class FileServiceTests extends TestBase {
         var response = fileService.listFiles(null, 10, 0);
 
         Assertions.assertEquals(0, response.getTotal());
-        Assertions.assertTrue(response.getFiles() == null
-                                      || response.getFiles().isEmpty());
+        Assertions.assertTrue(response.getItems() == null
+                                      || response.getItems().isEmpty());
     }
 
     @Test
@@ -89,18 +83,18 @@ class FileServiceTests extends TestBase {
         createFile("c.txt", null);
 
         var firstPage = fileService.listFiles(null, 2, 0);
-        var secondPage = fileService.listFiles(null, 2, 2);
+        var secondPage = fileService.listFiles(null, 2, 1);
 
         Assertions.assertEquals(3, firstPage.getTotal());
         Assertions.assertEquals(3, secondPage.getTotal());
-        Assertions.assertEquals(2, firstPage.getFiles().size());
-        Assertions.assertEquals(1, secondPage.getFiles().size());
+        Assertions.assertEquals(2, firstPage.getItems().size());
+        Assertions.assertEquals(1, secondPage.getItems().size());
 
-        var firstIds = firstPage.getFiles().stream()
-                .map(file -> file.getId())
+        var firstIds = firstPage.getItems().stream()
+                .map(ItemDTO::getId)
                 .toList();
 
-        var secondId = secondPage.getFiles().getFirst().getId();
+        var secondId = secondPage.getItems().getFirst().getId();
 
         Assertions.assertFalse(firstIds.contains(secondId));
     }
@@ -113,7 +107,7 @@ class FileServiceTests extends TestBase {
     void updateFile_shouldRenameFile() {
         var file = createFile("old.txt", null);
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setName(JsonNullable.of("new.txt"));
 
         var result = fileService.updateFile(file.getId(), request);
@@ -129,14 +123,14 @@ class FileServiceTests extends TestBase {
         var file = createFile("photo.raw", null);
         var directory = createDirectory("photos");
 
-        var request = new UpdateItemRequest();
-        request.setDirectoryId(JsonNullable.of(directory.getId()));
+        var request = new UpdateFileRequest();
+        request.setParentId(JsonNullable.of(directory.getId()));
 
         var result = fileService.updateFile(file.getId(), request);
 
-        Assertions.assertEquals(directory.getId(), result.getDirectoryId());
+        Assertions.assertEquals(directory.getId(), result.getParentId());
         Assertions.assertEquals(directory.getId(),
-                                reloadFile(file.getId()).getDirectory().getId());
+                                reloadFile(file.getId()).getParentId());
     }
 
     @Test
@@ -144,13 +138,13 @@ class FileServiceTests extends TestBase {
         var directory = createDirectory("photos");
         var file = createFile("photo.raw", directory);
 
-        var request = new UpdateItemRequest();
-        request.setDirectoryId(JsonNullable.of(null));
+        var request = new UpdateFileRequest();
+        request.setParentId(JsonNullable.of(null));
 
         var result = fileService.updateFile(file.getId(), request);
 
-        Assertions.assertNull(result.getDirectoryId());
-        Assertions.assertNull(reloadFile(file.getId()).getDirectory());
+        Assertions.assertNull(result.getParentId());
+        Assertions.assertNull(reloadFile(file.getId()).getParentId());
     }
 
     @Test
@@ -158,7 +152,7 @@ class FileServiceTests extends TestBase {
         var directory = createDirectory("photos");
         var file = createFile("original.raw", directory);
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setName(JsonNullable.of("renamed.raw"));
 
         fileService.updateFile(file.getId(), request);
@@ -166,7 +160,7 @@ class FileServiceTests extends TestBase {
         var persisted = reloadFile(file.getId());
 
         Assertions.assertEquals("renamed.raw", persisted.getName());
-        Assertions.assertEquals(directory.getId(), persisted.getDirectory().getId());
+        Assertions.assertEquals(directory.getId(), persisted.getParentId());
         Assertions.assertEquals(1024L, persisted.getSize());
         Assertions.assertEquals("image/x-canon-cr2", persisted.getContentType());
         Assertions.assertEquals("a".repeat(64), persisted.getChecksum());
@@ -174,7 +168,7 @@ class FileServiceTests extends TestBase {
 
     @Test
     void updateFile_shouldThrowWhenFileDoesNotExist() {
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setName(JsonNullable.of("new.txt"));
 
         Assertions.assertThrows(NotFoundException.class,
@@ -185,13 +179,13 @@ class FileServiceTests extends TestBase {
     void updateFile_shouldThrowWhenTargetDirectoryDoesNotExist() {
         var file = createFile("test.txt", null);
 
-        var request = new UpdateItemRequest();
-        request.setDirectoryId(JsonNullable.of(UUID.randomUUID()));
+        var request = new UpdateFileRequest();
+        request.setParentId(JsonNullable.of(UUID.randomUUID()));
 
         Assertions.assertThrows(NotFoundException.class,
                                 () -> fileService.updateFile(file.getId(), request));
 
-        Assertions.assertNull(reloadFile(file.getId()).getDirectory());
+        Assertions.assertNull(reloadFile(file.getId()).getParentId());
     }
 
     @Test
@@ -201,7 +195,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setDescription(JsonNullable.of("New description"));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         var result = fileService.updateFile(file.getId(), request);
@@ -225,7 +219,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setDescription(JsonNullable.of(null));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         fileService.updateFile(file.getId(), request);
@@ -246,7 +240,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setCustom(JsonNullable.of(custom));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         fileService.updateFile(file.getId(), request);
@@ -264,7 +258,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setCustom(JsonNullable.of(Map.of("iso", 1600)));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         fileService.updateFile(file.getId(), request);
@@ -281,7 +275,7 @@ class FileServiceTests extends TestBase {
     void updateFile_shouldRejectNullAdditionalData() {
         var file = createFile("test.txt", null);
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(null));
 
         Assertions.assertThrows(BadRequestException.class,
@@ -294,7 +288,7 @@ class FileServiceTests extends TestBase {
 
         updateDescription(file.getId(), "Original");
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(
                 JsonNullable.of(new UpdateMetadataRequest())
         );
@@ -426,22 +420,25 @@ class FileServiceTests extends TestBase {
 
     //region Private methods
 
-    private DirectoryEntity createDirectory(String name) {
+    private ItemEntity createDirectory(String name) {
         return transactionTemplate.execute(status -> {
-            var directory = new DirectoryEntity();
+            var directory = new ItemEntity();
+            directory.setId(UUID.randomUUID());
             directory.setName(name);
+            directory.setType(ItemType.DIRECTORY);
             directory.setMetadata(new MetadataEntity());
 
-            return directoryRepository.saveAndFlush(directory);
+            return itemRepository.saveAndFlush(directory);
         });
     }
 
-    private FileEntity createFile(String name, DirectoryEntity directory) {
+    private ItemEntity createFile(String name, ItemEntity directory) {
         return transactionTemplate.execute(status -> {
-            var file = new FileEntity();
+            var file = new ItemEntity();
             file.setId(UUID.randomUUID());
             file.setName(name);
-            file.setDirectory(directory);
+            file.setType(ItemType.FILE);
+            file.setParentId(directory == null ? null : directory.getId());
             file.setSize(1024L);
             file.setContentType("image/x-canon-cr2");
             file.setChecksum("a".repeat(64));
@@ -454,18 +451,10 @@ class FileServiceTests extends TestBase {
         });
     }
 
-    private FileEntity reloadFile(UUID id) {
+    private ItemEntity reloadFile(UUID id) {
         return transactionTemplate.execute(status -> {
             entityManager.clear();
-
-            var file = fileRepository.findById(id).orElseThrow();
-
-            // Inicializace lazy vztahů před uzavřením transakce.
-            if (file.getDirectory() != null) {
-                file.getDirectory().getId();
-            }
-
-            return file;
+            return itemRepository.findFileById(id).orElseThrow();
         });
     }
 
@@ -473,7 +462,7 @@ class FileServiceTests extends TestBase {
         return transactionTemplate.execute(status -> {
             entityManager.clear();
 
-            var file = fileRepository.findById(fileId).orElseThrow();
+            var file = itemRepository.findFileById(fileId).orElseThrow();
             var metadata = file.getMetadata();
 
             // Inicializace lazy kolekce.
@@ -487,12 +476,12 @@ class FileServiceTests extends TestBase {
         return transactionTemplate.execute(status -> {
             entityManager.clear();
 
-            return fileRepository.findById(fileId)
+            return itemRepository.findFileById(fileId)
                     .orElseThrow()
                     .getMetadata()
                     .getTags()
                     .stream()
-                    .map(tag -> tag.getValue())
+                    .map(TagEntity::getValue)
                     .collect(java.util.stream.Collectors.toSet());
         });
     }
@@ -501,7 +490,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setDescription(JsonNullable.of(description));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         fileService.updateFile(fileId, request);
@@ -518,7 +507,7 @@ class FileServiceTests extends TestBase {
         var metadata = new UpdateMetadataRequest();
         metadata.setTags(List.of(tags));
 
-        var request = new UpdateItemRequest();
+        var request = new UpdateFileRequest();
         request.setAdditionalData(JsonNullable.of(metadata));
 
         fileService.updateFile(fileId, request);

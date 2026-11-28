@@ -1,17 +1,17 @@
 package cz.kso.fabric.storage.services;
 
 import cz.kso.fabric.storage.api.model.CreateDirectoryRequest;
-import cz.kso.fabric.storage.api.model.DirectoryListResponse;
-import cz.kso.fabric.storage.api.model.DirectoryMetadata;
-import cz.kso.fabric.storage.api.model.UpdateItemRequest;
-import cz.kso.fabric.storage.entities.DirectoryEntity;
+import cz.kso.fabric.storage.api.model.ItemDTO;
+import cz.kso.fabric.storage.api.model.ItemListDTO;
+import cz.kso.fabric.storage.api.model.UpdateDirectoryRequest;
+import cz.kso.fabric.storage.entities.ItemEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
+import cz.kso.fabric.storage.entities.enums.ItemType;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.mappers.DirectoryMapper;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
-import cz.kso.fabric.storage.repositories.FileRepository;
+import cz.kso.fabric.storage.mappers.ItemMapper;
+import cz.kso.fabric.storage.repositories.ItemRepository;
 import cz.kso.fabric.storage.utils.MapperUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,91 +27,84 @@ import java.util.UUID;
 @Service
 public class DirectoryService {
 
-    private final DirectoryRepository directoryRepository;
-    private final FileRepository fileRepository;
+    private final ItemRepository itemRepository;
     private final FileService fileService;
     private final MapperUtils mapperUtils;
 
-    public DirectoryService(DirectoryRepository directoryRepository, FileRepository fileRepository, FileService fileService, MapperUtils mapperUtils) {
-        this.directoryRepository = directoryRepository;
-        this.fileRepository = fileRepository;
+    public DirectoryService(ItemRepository itemRepository, FileService fileService, MapperUtils mapperUtils) {
+        this.itemRepository = itemRepository;
         this.fileService = fileService;
         this.mapperUtils = mapperUtils;
     }
 
     @Transactional(readOnly = true)
-    public DirectoryListResponse listDirectories(UUID directoryId, Integer limit, Integer offset) {
-        log.info("Listing directories with limit: {}, offset: {}, directoryId: {}", limit, offset, directoryId);
+    public ItemListDTO listDirectories(UUID directoryId, Integer limit, Integer page) {
+        log.info("Listing directories with limit: {}, page: {}, directoryId: {}", limit, page, directoryId);
         // TODO authorization
         var pageable = PageRequest.of(
-                offset / limit,
+                page,
                 limit,
                 Sort.by(Sort.Order.asc("name"),
                         Sort.Order.asc("id"))
         );
 
-        Page<DirectoryEntity> entities;
-        if (directoryId == null) {
-            entities = directoryRepository.findByParentIdNull(pageable);
-        } else {
-            entities = directoryRepository.findByParent_Id(directoryId, pageable);
-        }
+        Page<ItemEntity> entities = itemRepository.findDirectoriesByParentId(directoryId, pageable);
 
-        var resp = new DirectoryListResponse();
-        resp.setTotal(entities.getTotalElements());;
+        var resp = new ItemListDTO();
+        resp.setTotal(entities.getTotalElements());
+        ;
         for (var entity : entities) {
-            resp.addDirectoriesItem(DirectoryMapper.toDto(entity));
+            resp.addItemsItem(ItemMapper.toDto(entity));
         }
 
         return resp;
     }
 
     @Transactional
-    public DirectoryMetadata createDirectory(CreateDirectoryRequest request) {
+    public ItemDTO createDirectory(CreateDirectoryRequest request) {
         var parentDirId = request.getParentId();
         log.info("Creating new directory in {}", parentDirId);
 
         // TODO authorization
-
-        DirectoryEntity parentDir = null;
-        if (parentDirId != null) {
-            parentDir = directoryRepository.findById(parentDirId)
-                    .orElseThrow(() -> new NotFoundException("Directory", parentDirId));
+        if (parentDirId != null && !itemRepository.existsDirectoryById(parentDirId)) {
+            throw new NotFoundException("Directory", parentDirId);
         }
 
-        var dirEntity = new DirectoryEntity();
+        var dirEntity = new ItemEntity();
+        dirEntity.setId(UUID.randomUUID());
         dirEntity.setName(request.getName());
-        dirEntity.setParent(parentDir);
+        dirEntity.setType(ItemType.DIRECTORY);
+        dirEntity.setParentId(parentDirId);
         dirEntity.setMetadata(new MetadataEntity());
 
-        dirEntity = directoryRepository.saveAndFlush(dirEntity);
+        dirEntity = itemRepository.saveAndFlush(dirEntity);
 
         log.info("New directory created: {}", dirEntity.getId());
-        return DirectoryMapper.toDto(dirEntity);
+        return ItemMapper.toDto(dirEntity);
     }
 
     @Transactional(readOnly = true)
-    public DirectoryMetadata getDirectory(UUID id) {
+    public ItemDTO getDirectory(UUID id) {
         log.info("Getting directory: {}", id);
 
-        var dirEntity = directoryRepository.findById(id)
+        var dirEntity = itemRepository.findDirectoryById(id)
                 .orElseThrow(() -> new NotFoundException("Directory", id));
 
-        return DirectoryMapper.toDto(dirEntity);
+        return ItemMapper.toDto(dirEntity);
     }
 
     @Transactional
-    public DirectoryMetadata updateDirectory(UUID id, UpdateItemRequest request) {
+    public ItemDTO updateDirectory(UUID id, UpdateDirectoryRequest request) {
         log.info("Updating directory: {}", id);
         // TODO authorization
-        var dirEntity = directoryRepository.findById(id)
+        var dirEntity = itemRepository.findDirectoryById(id)
                 .orElseThrow(() -> new NotFoundException("Directory", id));
 
         MapperUtils.applyIfPresent(request.getName(), dirEntity::setName);
-        mapperUtils.updateDirectoryIfPresent(request.getDirectoryId(), dirEntity::setParent);
-        mapperUtils.updateMetadataIfPresent(request, dirEntity);
+        MapperUtils.applyIfPresent(request.getParentId(), dirEntity::setParentId);
+        mapperUtils.updateIfPresent(request.getAdditionalData(), dirEntity);
 
-        return DirectoryMapper.toDto(dirEntity);
+        return ItemMapper.toDto(dirEntity);
     }
 
     public void deleteDirectory(UUID id, Boolean recursive) throws IOException {
@@ -123,13 +116,11 @@ public class DirectoryService {
             throw new BadRequestException("Cannot delete root directory");
         }
 
-        if (!directoryRepository.existsById(id)) {
+        if (!itemRepository.existsDirectoryById(id)) {
             throw new NotFoundException("Directory", id);
         }
 
-        var hasItems = directoryRepository.existsByParent_Id(id) || fileRepository.existsByDirectory_Id(id);
-
-        if (hasItems && !Boolean.TRUE.equals(recursive)) {
+        if (itemRepository.existsByParentId(id) && !Boolean.TRUE.equals(recursive)) {
             throw new ConflictException("Directory %s is not empty and recursive is not allowed", id);
         }
 
@@ -138,7 +129,7 @@ public class DirectoryService {
             deleteDirectoriesInParent(id);
         }
 
-        directoryRepository.deleteById(id);
+        itemRepository.deleteById(id);
     }
 
     //region Delete directory
@@ -147,8 +138,8 @@ public class DirectoryService {
         var firstPage = PageRequest.of(0, 100);
 
         while (true) {
-            var fileIds = fileRepository.findFileIdsByDirectory_Id(directoryId,
-                                                                   firstPage);
+            var fileIds = itemRepository.findFileIdsByParentId(directoryId,
+                                                               firstPage);
 
             if (fileIds.isEmpty()) {
                 break;
@@ -164,8 +155,8 @@ public class DirectoryService {
         var firstPage = PageRequest.of(0, 100);
 
         while (true) {
-            var dirIds = directoryRepository.findDirectoryIdsByParent_Id(parentId,
-                                                                         firstPage);
+            var dirIds = itemRepository.findDirectoryIdsByParentId(parentId,
+                                                                   firstPage);
 
             if (dirIds.isEmpty()) {
                 break;

@@ -1,10 +1,10 @@
 package cz.kso.fabric.storage.controllers;
 
 import cz.kso.fabric.storage.api.FileApi;
-import cz.kso.fabric.storage.api.model.FileListResponse;
-import cz.kso.fabric.storage.api.model.FileMetadata;
-import cz.kso.fabric.storage.api.model.UpdateItemRequest;
+import cz.kso.fabric.storage.api.model.*;
 import cz.kso.fabric.storage.services.FileService;
+import jakarta.validation.constraints.Size;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -28,22 +30,34 @@ public class FileController implements FileApi {
     }
 
     @Override
-    public ResponseEntity<FileListResponse> listFiles(UUID directoryId, Integer limit, Integer offset) {
-        return ResponseEntity.ok(fileService.listFiles(directoryId, limit, offset));
-    }
-
-    @Override
-    public ResponseEntity<FileMetadata> getFile(UUID id) {
+    public ResponseEntity<ItemDTO> getFile(UUID id) {
         return ResponseEntity.ok(fileService.getFile(id));
     }
 
     @Override
-    public ResponseEntity<FileMetadata> updateFile(UUID id, UpdateItemRequest updateFileRequest) {
+    public ResponseEntity<ItemListDTO> listFiles(@Nullable UUID directoryId,
+                                                 @Nullable String name,
+                                                 @Nullable Set<@Size(min = 1, max = 100) String> tags,
+                                                 @Nullable Long minSize,
+                                                 @Nullable Long maxSize,
+                                                 @Nullable OffsetDateTime createdFrom,
+                                                 @Nullable OffsetDateTime createdTo,
+                                                 @Nullable OffsetDateTime updatedFrom,
+                                                 @Nullable OffsetDateTime updatedTo,
+                                                 ItemSort sort,
+                                                 SortOrder order,
+                                                 Integer limit,
+                                                 Integer page) {
+        return ResponseEntity.ok(fileService.listFiles(directoryId, limit, limit));
+    }
+
+    @Override
+    public ResponseEntity<ItemDTO> updateFile(UUID id, UpdateFileRequest updateFileRequest) {
         return ResponseEntity.ok(fileService.updateFile(id, updateFileRequest));
     }
 
     @Override
-    public ResponseEntity<FileMetadata> uploadFile(String xFileName,
+    public ResponseEntity<ItemDTO> uploadFile(String xFileName,
                                                    Resource body,
                                                    UUID xDirectoryId,
                                                    String xContentSHA256,

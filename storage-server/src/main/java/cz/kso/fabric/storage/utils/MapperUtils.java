@@ -1,26 +1,22 @@
 package cz.kso.fabric.storage.utils;
 
-import cz.kso.fabric.storage.api.model.UpdateItemRequest;
 import cz.kso.fabric.storage.api.model.UpdateMetadataRequest;
 import cz.kso.fabric.storage.api.model.UpdateTagItem;
-import cz.kso.fabric.storage.entities.DirectoryEntity;
-import cz.kso.fabric.storage.entities.EntryEntity;
+import cz.kso.fabric.storage.entities.ItemEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
 import cz.kso.fabric.storage.entities.TagEntity;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
-import cz.kso.fabric.storage.exceptions.NotFoundException;
-import cz.kso.fabric.storage.repositories.DirectoryRepository;
 import cz.kso.fabric.storage.repositories.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.openapitools.jackson.nullable.JsonNullable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -28,7 +24,6 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class MapperUtils {
 
-    private final DirectoryRepository directoryRepository;
     private final TagRepository tagRepository;
 
     public static <T> void applyIfPresent(JsonNullable<T> value, Consumer<T> setter) {
@@ -37,23 +32,11 @@ public class MapperUtils {
         }
     }
 
-    public void updateDirectoryIfPresent(JsonNullable<UUID> directoryId, Consumer<DirectoryEntity> setter) {
-        if (directoryId.isPresent()) {
-            var dirId = directoryId.get();
-            DirectoryEntity dirEntity = null;
-            if (dirId != null) {
-                dirEntity = directoryRepository.findById(dirId)
-                        .orElseThrow(() -> new NotFoundException("Directory", dirId));
-            }
-            setter.accept(dirEntity);
-        }
-    }
-
-    public void updateMetadataIfPresent(UpdateItemRequest request, EntryEntity entity) {
-        if (request.getAdditionalData().isPresent()) {
+    public void updateIfPresent(JsonNullable<UpdateMetadataRequest> request, ItemEntity entity) {
+        if (request.isPresent()) {
             entity.setUpdatedAt(Instant.now());
 
-            var updateMetadataRequest = request.getAdditionalData().get();
+            var updateMetadataRequest = request.get();
             if (updateMetadataRequest == null) {
                 log.error("Metadata update object cannot be null");
                 throw new BadRequestException();
