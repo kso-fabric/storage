@@ -5,10 +5,8 @@ import cz.kso.fabric.storage.api.model.ItemListDTO;
 import cz.kso.fabric.storage.api.model.UpdateFileRequest;
 import cz.kso.fabric.storage.config.StorageProperties;
 import cz.kso.fabric.storage.entities.ItemEntity;
-import cz.kso.fabric.storage.entities.MetadataEntity;
-import cz.kso.fabric.storage.entities.enums.ItemType;
+import cz.kso.fabric.storage.entities.enums.ItemTypeDb;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
-import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.mappers.ItemMapper;
@@ -19,9 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,41 +41,18 @@ public class FileService {
 
     private final StorageProperties storageProperties;
     private final ItemRepository itemRepository;
+    private final ItemService itemService;
     private final StorageService storageService;
     private final MapperUtils mapperUtils;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
-    @Transactional(readOnly = true)
     public ItemListDTO listFiles(UUID directoryId, Integer limit, Integer page) {
-        log.info("Listing files with limit: {}, page: {}, directoryId: {}", limit, page, directoryId);
-        // TODO authorization
-        var pageable = PageRequest.of(
-                page,
-                limit,
-                Sort.by(Sort.Order.asc("name"),
-                        Sort.Order.asc("id"))
-        );
-
-        Page<ItemEntity> entities = itemRepository.findFilesByParentId(directoryId, pageable);
-
-        var resp = new ItemListDTO();
-        resp.setTotal(entities.getTotalElements());
-        for (var entity : entities) {
-            resp.addItemsItem(ItemMapper.toDto(entity));
-        }
-
-        return resp;
+        return itemService.listItems(directoryId, ItemTypeDb.FILE, limit, page);
     }
 
-    @Transactional
     public ItemDTO getFile(UUID id) {
-        log.info("Getting file: {}", id);
-        // TODO authorization
-        var fileEntity = itemRepository.findFileById(id)
-                .orElseThrow(() -> new NotFoundException("File", id));
-
-        return ItemMapper.toDto(fileEntity);
+        return itemService.getItem(id, ItemTypeDb.FILE);
     }
 
     @Transactional
@@ -93,7 +65,7 @@ public class FileService {
         if (request.getParentId().isPresent()) {
             var parentId = request.getParentId().get();
             if (!itemRepository.existsDirectoryById(parentId)
-            && parentId != null) {
+                    && parentId != null) {
                 throw new NotFoundException("Directory", parentId);
             }
         }
@@ -105,6 +77,7 @@ public class FileService {
         return ItemMapper.toDto(fileEntity);
     }
 
+    @Transactional
     public ItemDTO uploadFile(String fileName,
                               UUID directoryId,
                               String sha256,
@@ -112,29 +85,15 @@ public class FileService {
                               long contentLength,
                               InputStream input) throws IOException {
         log.info("Uploading new file {} in directory {}", fileName, directoryId);
-        // TODO authorization
-        if (directoryId != null && !itemRepository.existsDirectoryById(directoryId)) {
-            throw new NotFoundException("Directory", directoryId);
-        }
-
-        if (itemRepository.existsByParentIdAndName(directoryId, fileName)) {
-            throw new ConflictException("File %s already exists in directory %s",
-                                        fileName,
-                                        directoryId);
-        }
-
         log.info("Upload Content-Length: {}", contentLength);
         if (contentLength >= 0 && !storageService.hasEnoughSpace(contentLength)) {
             throw new InsufficientStorageException();
         }
 
-        var fileEntity = new ItemEntity();
-        fileEntity.setId(UUID.randomUUID());
-        fileEntity.setName(fileName);
-        fileEntity.setType(ItemType.FILE);
-        fileEntity.setParentId(directoryId);
+        var fileEntity = itemService.createItem(fileName,
+                                                directoryId,
+                                                ItemTypeDb.FILE);
         fileEntity.setContentType(contentType);
-        fileEntity.setMetadata(new MetadataEntity());
 
         var path = getFilePath(fileEntity);
         writeFile(fileEntity, path, sha256, input);
@@ -257,7 +216,7 @@ public class FileService {
     public void deleteFile(UUID id) throws IOException {
         log.info("Deleting file: {}", id);
 
-        transactionTemplate.executeWithoutResult(status -> {
+        transactionTemplate.executeWithoutResult(_ -> {
             var fileEntity = itemRepository.findFileById(id)
                     .orElseThrow(() -> new NotFoundException("File", id));
 

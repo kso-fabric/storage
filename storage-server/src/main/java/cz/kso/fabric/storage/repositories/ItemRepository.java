@@ -1,7 +1,7 @@
 package cz.kso.fabric.storage.repositories;
 
 import cz.kso.fabric.storage.entities.ItemEntity;
-import cz.kso.fabric.storage.entities.enums.ItemType;
+import cz.kso.fabric.storage.entities.enums.ItemTypeDb;
 import cz.kso.fabric.storage.repositories.projections.ItemSizeProjection;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -22,39 +22,31 @@ public interface ItemRepository extends JpaRepository<ItemEntity, UUID> {
 
     //region Queries
 
-    Optional<ItemEntity> findByIdAndType(UUID id, ItemType type);
+    Optional<ItemEntity> findByIdAndType(UUID id, ItemTypeDb type);
 
     default Optional<ItemEntity> findFileById(UUID id) {
-        return findByIdAndType(id, ItemType.FILE);
+        return findByIdAndType(id, ItemTypeDb.FILE);
     }
 
     default Optional<ItemEntity> findDirectoryById(UUID id) {
-        return findByIdAndType(id, ItemType.DIRECTORY);
+        return findByIdAndType(id, ItemTypeDb.DIRECTORY);
     }
 
     Page<ItemEntity> findByParentId(@Nullable UUID parentId, Pageable pageable);
 
-    Page<ItemEntity> findAllByParentIdAndType(@Nullable UUID parentId, ItemType type, Pageable pageable);
-
-    default Page<ItemEntity> findFilesByParentId(@Nullable UUID parentId, Pageable pageable) {
-        return findAllByParentIdAndType(parentId, ItemType.FILE, pageable);
-    }
-
-    default Page<ItemEntity> findDirectoriesByParentId(@Nullable UUID parentId, Pageable pageable) {
-        return findAllByParentIdAndType(parentId, ItemType.DIRECTORY, pageable);
-    }
+    Page<ItemEntity> findByParentIdAndType(@Nullable UUID parentId, ItemTypeDb type, Pageable pageable);
 
     @Query("""
             SELECT f.id
             FROM ItemEntity f
-            WHERE f.type = ItemType.FILE
+            WHERE f.type = ItemTypeDb.FILE
             """)
     Stream<UUID> streamAllFileIds();
 
     @Query("""
             SELECT new cz.kso.fabric.storage.repositories.projections.ItemSizeProjection(f.id, f.size)
             FROM ItemEntity f
-            WHERE f.id IN :ids AND f.type = ItemType.FILE
+            WHERE f.id IN :ids AND f.type = ItemTypeDb.FILE
             """)
     List<ItemSizeProjection> findFileSizesByIds(@Param("ids") Collection<UUID> ids);
 
@@ -66,14 +58,14 @@ public interface ItemRepository extends JpaRepository<ItemEntity, UUID> {
             ORDER BY item.id
             """)
     List<UUID> findIdsByParentIdAndType(@Nullable @Param("parentId") UUID parentId,
-                                        @Param("type") ItemType type, Pageable pageable);
+                                        @Param("type") ItemTypeDb type, Pageable pageable);
 
     default List<UUID> findFileIdsByParentId(@Nullable UUID parentId, Pageable pageable) {
-        return findIdsByParentIdAndType(parentId, ItemType.FILE, pageable);
+        return findIdsByParentIdAndType(parentId, ItemTypeDb.FILE, pageable);
     }
 
     default List<UUID> findDirectoryIdsByParentId(@Nullable UUID parentId, Pageable pageable) {
-        return findIdsByParentIdAndType(parentId, ItemType.DIRECTORY, pageable);
+        return findIdsByParentIdAndType(parentId, ItemTypeDb.DIRECTORY, pageable);
     }
 
     //endregion
@@ -88,9 +80,19 @@ public interface ItemRepository extends JpaRepository<ItemEntity, UUID> {
     /// @param parentId Tested directory.
     boolean existsByParentId(@Nullable UUID parentId);
 
-    boolean existsFileById(UUID id);
+    boolean existsByParentIdAndNameAndType(@Nullable UUID parentId,
+                                           String name,
+                                           ItemTypeDb type);
 
-    boolean existsDirectoryById(UUID id);
+    boolean existsByIdAndType(UUID id, ItemTypeDb type);
+
+    default boolean existsFileById(UUID id) {
+        return existsByIdAndType(id, ItemTypeDb.FILE);
+    }
+
+    default boolean existsDirectoryById(UUID id) {
+        return existsByIdAndType(id, ItemTypeDb.DIRECTORY);
+    }
 
     //endregion
 
@@ -99,11 +101,11 @@ public interface ItemRepository extends JpaRepository<ItemEntity, UUID> {
     @Query("""
             SELECT COALESCE(SUM(f.size), 0)
             FROM ItemEntity f
-            WHERE f.type = ItemType.FILE
+            WHERE f.type = ItemTypeDb.FILE
             """)
     long getTotalFileSize();
 
-    @Query("SELECT COUNT(*) FROM ItemEntity f WHERE f.type = ItemType.FILE")
+    @Query("SELECT COUNT(*) FROM ItemEntity f WHERE f.type = ItemTypeDb.FILE")
     long countFiles();
 
     //endregion

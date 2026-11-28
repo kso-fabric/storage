@@ -226,7 +226,7 @@ public class DirectoryServiceTests extends TestBase {
 
         assertFileDeleted(firstFile);
 
-        Assertions.assertTrue(itemRepository.existsDirectoryById(secondFile));
+        Assertions.assertTrue(itemRepository.existsFileById(secondFile));
         Assertions.assertTrue(Files.exists(storageRoot.resolve(secondFile.toString())));
     }
 

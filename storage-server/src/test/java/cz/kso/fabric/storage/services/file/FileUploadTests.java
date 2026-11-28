@@ -3,7 +3,7 @@ package cz.kso.fabric.storage.services.file;
 import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.entities.ItemEntity;
 import cz.kso.fabric.storage.entities.MetadataEntity;
-import cz.kso.fabric.storage.entities.enums.ItemType;
+import cz.kso.fabric.storage.entities.enums.ItemTypeDb;
 import cz.kso.fabric.storage.exceptions.ChecksumMismatchException;
 import cz.kso.fabric.storage.exceptions.ConflictException;
 import cz.kso.fabric.storage.exceptions.InsufficientStorageException;
@@ -37,7 +37,7 @@ public class FileUploadTests extends TestBase {
     static void storageProperties(DynamicPropertyRegistry registry) {
         registry.add(
                 "cz.kso.fabric.storage.disc-root",
-                () -> STORAGE_ROOT.toString()
+                STORAGE_ROOT::toString
         );
     }
 
@@ -223,11 +223,11 @@ public class FileUploadTests extends TestBase {
     }
 
     private ItemEntity createDirectory(String name) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             var directory = new ItemEntity();
             directory.setId(UUID.randomUUID());
             directory.setName(name);
-            directory.setType(ItemType.DIRECTORY);
+            directory.setType(ItemTypeDb.DIRECTORY);
             directory.setMetadata(new MetadataEntity());
 
             entityManager.persist(directory);

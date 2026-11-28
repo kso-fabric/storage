@@ -3,7 +3,7 @@ package cz.kso.fabric.storage.services.file;
 import cz.kso.fabric.storage.TestBase;
 import cz.kso.fabric.storage.api.model.*;
 import cz.kso.fabric.storage.entities.*;
-import cz.kso.fabric.storage.entities.enums.ItemType;
+import cz.kso.fabric.storage.entities.enums.ItemTypeDb;
 import cz.kso.fabric.storage.exceptions.BadRequestException;
 import cz.kso.fabric.storage.exceptions.NotFoundException;
 import cz.kso.fabric.storage.repositories.ItemRepository;
@@ -421,11 +421,11 @@ class FileServiceTests extends TestBase {
     //region Private methods
 
     private ItemEntity createDirectory(String name) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             var directory = new ItemEntity();
             directory.setId(UUID.randomUUID());
             directory.setName(name);
-            directory.setType(ItemType.DIRECTORY);
+            directory.setType(ItemTypeDb.DIRECTORY);
             directory.setMetadata(new MetadataEntity());
 
             return itemRepository.saveAndFlush(directory);
@@ -433,11 +433,11 @@ class FileServiceTests extends TestBase {
     }
 
     private ItemEntity createFile(String name, ItemEntity directory) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             var file = new ItemEntity();
             file.setId(UUID.randomUUID());
             file.setName(name);
-            file.setType(ItemType.FILE);
+            file.setType(ItemTypeDb.FILE);
             file.setParentId(directory == null ? null : directory.getId());
             file.setSize(1024L);
             file.setContentType("image/x-canon-cr2");
@@ -452,14 +452,14 @@ class FileServiceTests extends TestBase {
     }
 
     private ItemEntity reloadFile(UUID id) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             entityManager.clear();
             return itemRepository.findFileById(id).orElseThrow();
         });
     }
 
     private MetadataEntity loadMetadata(UUID fileId) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             entityManager.clear();
 
             var file = itemRepository.findFileById(fileId).orElseThrow();
@@ -473,7 +473,7 @@ class FileServiceTests extends TestBase {
     }
 
     private Set<String> loadTagValues(UUID fileId) {
-        return transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(_ -> {
             entityManager.clear();
 
             return itemRepository.findFileById(fileId)

@@ -1,6 +1,6 @@
 package cz.kso.fabric.storage.entities;
 
-import cz.kso.fabric.storage.entities.enums.ItemType;
+import cz.kso.fabric.storage.entities.enums.ItemTypeDb;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,7 +27,7 @@ public class ItemEntity {
     private UUID parentId;
 
     @Enumerated(EnumType.STRING)
-    private ItemType type;
+    private ItemTypeDb type;
 
     @Column(name = "size", nullable = false)
     private long size;
